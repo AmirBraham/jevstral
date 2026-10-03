@@ -4,7 +4,8 @@ from dataclasses import dataclass
 
 from .records import Record
 
-# Unused placeholder tokens of the Mistral tokenizer. User text cannot make them (see Encoder.text).
+# Reserved placeholder tokens of the Mistral tokenizer: no name, no role.
+# User text cannot make them (see Encoder.text).
 DELIMITERS = {
     "state": "<SPECIAL_20>",
     "question": "<SPECIAL_21>",

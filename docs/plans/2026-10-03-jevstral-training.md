@@ -592,7 +592,7 @@ Encoding changes a record into token rows. Each question gets its own row.
 <s> <state> state text <q> instructions <opt> option 1 </opt> <opt> option 2 </opt> ... <decide>
 ```
 
-- `<s>` is the Mistral BOS token. The base model always saw it at the start of its input.
+- `<s>` is the Mistral BOS token. The tokenizer adds it by default, so normal model inputs start with it.
 - A record with three questions gives three rows. Each row has the full state.
 - A question cannot see another question, because it is in a different row.
 
@@ -606,7 +606,10 @@ Encoding changes a record into token rows. Each question gets its own row.
 | `</opt>` | `<SPECIAL_23>` | 23 |
 | `<decide>` | `<SPECIAL_26>` | 26 |
 
-These are unused placeholder tokens. Their embeddings are trained (see `lora.md`).
+These are reserved placeholder tokens. Mistral gives them no name and no role: they fill the gaps between named control tokens such as `[TOOL_CALLS]` and `[AUDIO]`. We did not verify that the base model never saw them. For this reason:
+
+- We train their embedding rows (see `lora.md`), so their meaning comes from our training.
+- The `inspect_data` job measures their embedding norms against ordinary tokens.
 
 **Safety rule.** By default, the tokenizer changes the text `<SPECIAL_20>` into token 20. Then a user could write a fake option border. We tokenize all user text with `split_special_tokens=True`. Then the text `<SPECIAL_20>` stays plain text.
 
@@ -642,7 +645,8 @@ from dataclasses import dataclass
 
 from .records import Record
 
-# Unused placeholder tokens of the Mistral tokenizer. User text cannot make them (see Encoder.text).
+# Reserved placeholder tokens of the Mistral tokenizer: no name, no role.
+# User text cannot make them (see Encoder.text).
 DELIMITERS = {
     "state": "<SPECIAL_20>",
     "question": "<SPECIAL_21>",

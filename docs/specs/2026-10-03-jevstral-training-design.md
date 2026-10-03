@@ -142,13 +142,13 @@ Each question becomes one token row:
 
 A record with three questions gives three rows. Each row has the full state. A question cannot see another question.
 
-`<s>` is the Mistral BOS token. The base model always saw it at the start of its input during pretraining.
+`<s>` is the Mistral BOS token. The tokenizer adds it by default, so normal model inputs start with it.
 
 ### 5.1 Delimiter tokens
 
 The five delimiters are tokens from the Mistral tokenizer, not text. User text cannot make these tokens. This stops fake options in the state or in the option text.
 
-We use five unused placeholder tokens:
+We use five reserved placeholder tokens. Mistral gives them no name and no role. We did not verify that the base model never saw them:
 
 | Delimiter | Token | ID |
 |---|---|---|
