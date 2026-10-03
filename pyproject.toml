@@ -1,0 +1,25 @@
+[project]
+name = "jevstral"
+version = "0.1.0"
+description = "A decision model on Ministral 3 8B, trained with the Kev method"
+requires-python = ">=3.12,<3.13"
+dependencies = ["modal>=1.6,<2"]
+
+[dependency-groups]
+# Installed only in the Modal image (modal_app.py), not on the local computer.
+train = ["torch==2.14.1", "transformers==5.18.0", "peft==0.21.2"]
+dev = ["ruff>=0.14"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/jevstral"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
