@@ -126,7 +126,7 @@ Jevstral uses the Kev record format without changes:
 | `noul` | `no`, `yes`. A description from `criteria.false` or `criteria.true` is added if it exists. | 0 for false, 1 for true |
 | `score` | One option for each level, in order | Level index |
 
-A JSON state becomes text with `json.dumps(state, sort_keys=True, ensure_ascii=False)`.
+A JSON state becomes labelled text with the rules of `render()` in `kev/api.py`: one `key: value` line for each field, and `- item` lines for a list.
 
 Some records have a `target`. A `target` is a soft label, for example a uniform distribution for a question that the state cannot answer. The loss uses the target when it exists (section 7.2).
 
@@ -137,25 +137,41 @@ Some records have a `target`. A `target` is a soft label, for example a uniform 
 Each question becomes one token row:
 
 ```
-<state> state text <q> instructions <opt> option 1 </opt> <opt> option 2 </opt> ... <decide>
+<s> <state> state text <q> instructions <opt> option 1 </opt> <opt> option 2 </opt> ... <decide>
 ```
 
 A record with three questions gives three rows. Each row has the full state. A question cannot see another question.
+
+`<s>` is the Mistral BOS token. The base model always saw it at the start of its input during pretraining.
 
 ### 5.1 Delimiter tokens
 
 The five delimiters are tokens from the Mistral tokenizer, not text. User text cannot make these tokens. This stops fake options in the state or in the option text.
 
-We use five unused `<SPECIAL_n>` tokens. The first Modal job measures the embedding norm of each candidate token. It also measures the norm of ordinary tokens. If the candidate norms show that the tokens were not trained, we train their five embedding rows (section 6.3).
+We use five unused placeholder tokens:
+
+| Delimiter | Token | ID |
+|---|---|---|
+| `<state>` | `<SPECIAL_20>` | 20 |
+| `<q>` | `<SPECIAL_21>` | 21 |
+| `<opt>` | `<SPECIAL_22>` | 22 |
+| `</opt>` | `<SPECIAL_23>` | 23 |
+| `<decide>` | `<SPECIAL_26>` | 26 |
+
+By default, the tokenizer changes the text `<SPECIAL_20>` into token 20. We tokenize all user text with `split_special_tokens=True`. Then that text stays plain text.
+
+We always train the five embedding rows of these tokens (section 6.3). The `inspect_data` job measures their embedding norms and the norms of ordinary tokens. This measurement is for learning only. It does not change the training.
 
 ### 5.2 Limits
 
 | Value | Stages 1 and 2 | Stages 3 and 4 |
 |---|---|---|
-| State tokens, `<state>` included | 384 | 7,552 |
-| Tokens after the state, one question | 1,024 | 1,024 |
+| State tokens, `<s>` and `<state>` included | 384 | 7,552 |
+| Row tokens (state and one question) | 1,024 | 8,192 |
 
-If a state is longer than the limit, we cut it to the limit. If the question part is longer than its limit, we skip the record. The training log gives the number of cut states and skipped records.
+These are the Kev limits. If a record is longer than a limit, we skip the full record. Kev does the same in training. The training log gives the number of skipped records.
+
+Evaluation and calibration use the long limits for all files.
 
 ### 5.3 Positions in the row
 
@@ -171,7 +187,8 @@ If a state is longer than the limit, we cut it to the limit. If the question par
 ### 6.1 Backbone
 
 - Model: `mistralai/Ministral-3-8B-Base-2512`, pinned to one revision.
-- We load only the text decoder: 34 layers, hidden size 4,096. We do not load the vision encoder.
+- We load only the text decoder: 34 layers, hidden size 4,096. We do not use the vision encoder.
+- To load the decoder, we load the full `Mistral3ForConditionalGeneration` checkpoint and keep `model.language_model`. Do not use `Ministral3Model.from_pretrained` on this repository. It does not map the weight names, and it gives random weights without an error.
 - All backbone weights are frozen.
 - Training uses fp32 weights with bf16 autocast. Gradient checkpointing is on.
 - GPU: one H100 80 GB.
@@ -187,7 +204,7 @@ If a state is longer than the limit, we cut it to the limit. If the question par
 
 ### 6.3 Delimiter embeddings
 
-If section 5.1 shows untrained tokens, the five embedding rows of the delimiter tokens are trainable. All other embedding rows stay frozen.
+The five embedding rows of the delimiter tokens are trainable (PEFT `trainable_token_indices`). All other embedding rows stay frozen.
 
 ### 6.4 Pointer head
 
@@ -295,9 +312,13 @@ After each stage, the model runs on the `development.jsonl` file of each suite t
 | Function | GPU | Work |
 |---|---|---|
 | `prepare_data` | No | Download and verify all files (section 4) |
-| `inspect_tokens` | Yes | Measure the delimiter embedding norms (section 5.1) |
-| `train_stage` | Yes | Train one stage. Arguments: stage number, `smoke` flag. |
-| `calibrate` | Yes | Fit T (section 8) |
+| `inspect_data` | No | Measure the delimiter embedding norms. Encode all stages and report row counts and skipped records. |
+| `train_stage` | Yes | Train one stage. Arguments: stage number, `smoke` flag, git commit. |
+| `calibrate_stage4` | Yes | Fit T (section 8) |
+
+The local entry points `train` and `calibrate` start `train_stage` and `calibrate_stage4`. `train` sends the local git commit to the job.
+
+The local computer runs only the `modal` command. It does not install torch, and it does not download the model or the data.
 
 ### 10.3 Smoke run
 
@@ -307,11 +328,11 @@ Before each stage, run `train_stage` with `smoke=True`. The smoke run uses 64 re
 
 ```
 modal run modal_app.py::prepare_data
-modal run modal_app.py::inspect_tokens
-modal run modal_app.py::train_stage --stage 1 --smoke
-modal run modal_app.py::train_stage --stage 1
+modal run modal_app.py::inspect_data
+modal run modal_app.py::train --stage 1 --smoke
+modal run --detach modal_app.py::train --stage 1
 ...
-modal run modal_app.py::calibrate
+modal run --detach modal_app.py::calibrate
 ```
 
 ## 11. Checkpoints and errors
@@ -323,16 +344,17 @@ Each checkpoint folder has these files:
 - `adapter/`: the LoRA weights (PEFT format).
 - `head.pt`: the pointer head weights, the delimiter embedding rows and T.
 - `config.json`: the base model revision, the data revision, the stage configuration, the seed and the git commit.
-- `optimizer.pt` and `state.json`: the optimizer state, the scheduler state and the step. Only intermediate checkpoints have these files.
+- `resume.pt`: the optimizer state, the scheduler state and the position (epoch, batch, step). Only the intermediate checkpoint has this file.
 
 ### 11.2 Error handling
 
 | Condition | Action |
 |---|---|
 | SHA-256 or record count is different from the manifest | Stop. Give the file name. |
+| A calibration pool count is not 448 or 200 | Stop. Give the file name. |
 | A label is not one of the options | Stop. Give the record ID. |
 | Loss or gradient norm is not finite | Stop. Give the step. |
-| The record is too long (section 5.2) | Skip or cut. Count it in the log. |
+| The record is too long (section 5.2) | Skip the record. Count it in the log. |
 | The checkpoint has a different base model revision | Stop. Give the two revisions. |
 | Modal stops the job | Resume from the last intermediate checkpoint. |
 
@@ -355,6 +377,7 @@ We write these notes while we build the modules:
 | `decision-model.md` | All |
 | `jev-architecture.md` | All. It compares the essay with Jevstral. |
 | `encoding.md` | `encode.py` |
+| `augmentation.md` | `augment.py` |
 | `pointer-head.md` | `model.py` |
 | `lora.md` | `model.py` |
 | `training-stages.md` | `train.py`, `stages.py` |
