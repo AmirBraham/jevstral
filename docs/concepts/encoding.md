@@ -38,6 +38,15 @@ These are reserved placeholder tokens. Mistral gives them no name and no role: t
 
 The delimiter rows were never trained. Stage 1 starts them as samples of the real embedding distribution (see `lora.md`, section 9).
 
+Rows of the first epoch of each stage, after augmentation:
+
+| Stage | Rows | Skipped records | Median row tokens | Maximum row tokens | Row limit |
+|---|---|---|---|---|---|
+| 1 | 18,142 | 0 | 117 | 964 | 1,024 |
+| 2 | 3,855 | 0 | 117 | 942 | 1,024 |
+| 3 | 9,917 | 1 | 408 | 6,616 | 8,192 |
+| 4 | 21,236 | 0 | 173 | 4,988 | 8,192 |
+
 **Safety rule.** By default, the tokenizer changes the text `<SPECIAL_20>` into token 20. Then a user could write a fake option border. We tokenize all user text with `split_special_tokens=True`. Then the text `<SPECIAL_20>` stays plain text.
 
 ## Positions that the head reads
