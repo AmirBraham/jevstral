@@ -17,6 +17,7 @@ modal run modal_app.py::bench_sample --n 100
 python modal_app.py bench_full       (only after the sample, with an approved cost)
 """
 
+import contextlib
 import os
 import subprocess
 from pathlib import Path
@@ -157,6 +158,25 @@ def track_finished_stage(stage: int) -> None:
     print("run:", upload_finished_stage(RUNS_DIR / "main" / f"stage{stage}"))
 
 
+@contextlib.contextmanager
+def committing(volume: modal.Volume, every_seconds: int):
+    """Commit `volume` every `every_seconds` and at the end, so a stopped job keeps its files."""
+    import threading
+
+    stop = threading.Event()
+
+    def loop() -> None:
+        while not stop.wait(every_seconds):
+            volume.commit()
+
+    threading.Thread(target=loop, daemon=True).start()
+    try:
+        yield
+    finally:
+        stop.set()
+        volume.commit()
+
+
 def harness(*args: str) -> None:
     """Run one command of the Decision Index harness and stop on failure."""
     import sys
@@ -172,15 +192,22 @@ def harness(*args: str) -> None:
     subprocess.run(command, check=True, cwd=BENCH_DIR, env=env)
 
 
-@app.function(image=image, volumes={str(BENCH_DIR): bench}, secrets=SECRETS, memory=32768, timeout=8 * HOUR)
+@app.function(
+    image=image,
+    volumes={str(BENCH_DIR): bench},
+    secrets=SECRETS,
+    memory=32768,
+    timeout=8 * HOUR,
+    nonpreemptible=True,  # a preemption on 2026-10-04 lost 30 minutes of downloads
+)
 def build_suite() -> None:
     """Rebuild the Decision Index 0.2 suite from its public sources and verify it (CPU, about 7 GB of downloads).
 
     The Hugging Face token must have access to the gated dataset cais/hle.
     """
     built = "work/artifacts/benchmark-suite/release-v2-rebuilt"
-    harness("suite", "rebuild", "--work", "work")
-    bench.commit()
+    with committing(bench, every_seconds=300):
+        harness("suite", "rebuild", "--work", "work")
     harness(
         "suite",
         "import",
@@ -247,17 +274,8 @@ def bench_sample(n: int = 100, path: str = "bf16-merged") -> None:
 )
 def bench_full(path: str = "bf16-merged") -> None:
     """Run and score the full suite. Resumes from an existing results.jsonl. Start it with start_job (deployed app)."""
-    import threading
-
     out = f"runs/full-{path}"
-
-    def commit_often(stop: threading.Event) -> None:
-        while not stop.wait(600):
-            bench.commit()
-
-    stop = threading.Event()
-    threading.Thread(target=commit_often, args=(stop,), daemon=True).start()
-    try:
+    with committing(bench, every_seconds=600):
         harness(
             "pipeline",
             "--engine",
@@ -272,9 +290,6 @@ def bench_full(path: str = "bf16-merged") -> None:
             out,
             "--compact",
         )
-    finally:
-        stop.set()
-        bench.commit()
 
 
 def local_git_commit() -> str:
