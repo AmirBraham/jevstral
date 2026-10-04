@@ -215,13 +215,29 @@ Memory, approximately:
 
 ## 9. Trainable token rows
 
-The five delimiter tokens get trainable embedding rows. PEFT (`trainable_token_indices`) stores a change $D$ only for these rows:
+The five delimiter tokens get trainable embedding rows. PEFT (`trainable_token_indices`) keeps a trainable matrix $D$ with one row for each delimiter. In the forward pass, $D$ replaces these rows. It is not added to them:
 
 $$
-E'_i = E_i + D_i \quad \text{for } i \in \{20, 21, 22, 23, 26\}
+E'_i = D_i \quad \text{for } i \in \{20, 21, 22, 23, 26\}, \qquad E'_i = E_i \quad \text{for all other } i
 $$
 
 $D$ has $5 \times 4096 = 20{,}480$ numbers. All other rows of the embedding matrix $E$ stay frozen.
+
+**Start values.** In Ministral 3, the five original rows are all zeros (measured by `inspect_data`). Zero rows are identical, and RMSNorm of a zero vector gives very large gradients. Thus stage 1 starts each row $D_i$ as a sample from a normal distribution with the mean $\mu$ and covariance $\Sigma$ of the trained rows of $E$:
+
+$$
+D_i \sim \mathcal{N}(\mu, \Sigma)
+$$
+
+The code does not build the $4096 \times 4096$ matrix $\Sigma$. Let $X$ be the $n$ trained rows. With $w \sim \mathcal{N}(0, I_n)$:
+
+$$
+D_i = \mu + \frac{1}{\sqrt{n}} (X - \mu)^\top w
+$$
+
+This has the covariance $\frac{1}{n}(X - \mu)^\top (X - \mu) = \Sigma$.
+
+Hugging Face `resize_token_embeddings` uses the same distribution, but multiplies $\Sigma$ by $10^{-9}$. Then all new rows are almost equal to $\mu$. That method is for new words in a text generator. Jevstral needs five different delimiters, so it uses the full $\Sigma$.
 
 ## 10. Checkpoints
 

@@ -33,6 +33,19 @@ def load_text_decoder(dtype: torch.dtype = torch.float32) -> nn.Module:
     return decoder.to(dtype)
 
 
+def sample_embeddings(weight: torch.Tensor, count: int) -> torch.Tensor:
+    """Draw `count` vectors from a normal distribution with the mean and covariance of the trained embedding rows.
+
+    A draw is mean + (X - mean)^T w / sqrt(n), with w ~ N(0, I_n). Its covariance is (X - mean)^T (X - mean) / n,
+    so the hidden x hidden covariance matrix is not built. Rows with norm 0 were never trained and are not used.
+    """
+    rows = weight.detach().float()
+    rows = rows[rows.norm(dim=-1) > 0]
+    mean = rows.mean(dim=0)
+    w = torch.randn(rows.shape[0], count, device=rows.device)
+    return mean + ((rows - mean).T @ w).T / rows.shape[0] ** 0.5
+
+
 class PointerHead(nn.Module):
     """Score each option: the dot product of q(<decide>) and k(</opt>)."""
 
@@ -58,7 +71,11 @@ class DecisionModel(nn.Module):
                 target_modules=LORA_TARGETS,
                 trainable_token_indices={"embed_tokens": delimiter_ids},
             )
+            # The delimiter rows of Ministral 3 are all zeros. Start them as samples of the real embeddings instead.
+            start = sample_embeddings(decoder.get_input_embeddings().weight, len(delimiter_ids))
             self.decoder = get_peft_model(decoder, config)
+            with torch.no_grad():
+                self.delimiter_rows().copy_(start)
         else:
             self.decoder = PeftModel.from_pretrained(decoder, str(adapter_dir), is_trainable=True)
         self.head = PointerHead(decoder.config.hidden_size)
@@ -68,6 +85,10 @@ class DecisionModel(nn.Module):
     @property
     def device(self) -> torch.device:
         return self.head.q.weight.device
+
+    def delimiter_rows(self) -> nn.Parameter:
+        """The trainable embedding rows of the delimiters. PEFT uses them in place of the original rows."""
+        return next(p for name, p in self.decoder.named_parameters() if "trainable_tokens_delta" in name)
 
     def trainable_parameters(self) -> list[nn.Parameter]:
         return [p for p in self.parameters() if p.requires_grad]

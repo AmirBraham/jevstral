@@ -137,6 +137,7 @@ def run_stage(
     else:
         model = DecisionModel(decoder, encoder.delimiter_ids, encoder.pad)
     model.to("cuda" if torch.cuda.is_available() else "cpu")
+    print("delimiter row norms:", [round(n, 4) for n in model.delimiter_rows().norm(dim=-1).tolist()], flush=True)
     persist()  # keep the downloaded base model in the cache volume
 
     records = stage_records(stage, data_dir)

@@ -27,6 +27,17 @@ These are reserved placeholder tokens. Mistral gives them no name and no role: t
 - We train their embedding rows (see `lora.md`), so their meaning comes from our training.
 - The `inspect_data` job measures their embedding norms against ordinary tokens.
 
+## Measured values
+
+`inspect_data`, 2026-10-03:
+
+| Tokens | Embedding norm |
+|---|---|
+| Ordinary tokens (ID ≥ 1000) | mean 0.3646, standard deviation 0.0442 |
+| Delimiters 20, 21, 22, 23, 26 | 0.0000 (all numbers are zero) |
+
+The delimiter rows were never trained. Stage 1 starts them as samples of the real embedding distribution (see `lora.md`, section 9).
+
 **Safety rule.** By default, the tokenizer changes the text `<SPECIAL_20>` into token 20. Then a user could write a fake option border. We tokenize all user text with `split_special_tokens=True`. Then the text `<SPECIAL_20>` stays plain text.
 
 ## Positions that the head reads

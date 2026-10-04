@@ -206,6 +206,8 @@ Evaluation and calibration use the long limits for all files.
 
 The five embedding rows of the delimiter tokens are trainable (PEFT `trainable_token_indices`). All other embedding rows stay frozen.
 
+The original five rows are all zeros (measured by `inspect_data`). Stage 1 starts each row as a sample from a normal distribution with the mean and full covariance of the trained embedding rows. Rows with norm 0 are not used for the mean and covariance.
+
 ### 6.4 Pointer head
 
 ```
