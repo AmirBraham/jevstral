@@ -123,10 +123,13 @@ Training sends the loss, learning rate and gradient norm to the Weights & Biases
 uv run modal run modal_app.py::track_finished_stage --stage 1
 ```
 
+## License
+
+Apache 2.0 for the code and the weights. See [LICENSE](LICENSE). The training datasets have their own licenses; see the Kev model cards and suite manifests.
+
 ## Credits
 
 - [Kev](https://github.com/jaredpalmer/kev): the method, the training recipe and the data.
 - ["Jev's Architecture Unmasked"](https://archerhume.com/posts/jevs-architecture-unmasked): the architecture analysis that Kev follows.
 - [Mistral AI](https://mistral.ai): the open-weight base model, Ministral 3 8B Base (Apache 2.0).
 
-The training datasets have their own licenses. See the Kev model cards and suite manifests.

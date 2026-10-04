@@ -1,4 +1,5 @@
 ---
+license: apache-2.0
 language: en
 library_name: peft
 base_model: mistralai/Ministral-3-8B-Base-2512
@@ -144,7 +145,7 @@ The checkpoints use a custom head and input format. Load them with the code in t
 
 ## License
 
-The license for these weights is not chosen yet. The base model is Apache 2.0. The training datasets have their own licenses; see the Kev model cards and suite manifests.
+The weights (LoRA adapter, delimiter rows and pointer head) and the code are released under the [Apache 2.0 license](https://github.com/AmirBraham/jevstral/blob/main/LICENSE). The base model, `mistralai/Ministral-3-8B-Base-2512`, is also Apache 2.0. The training datasets have their own licenses; see the Kev model cards and suite manifests.
 
 ## Credits
 

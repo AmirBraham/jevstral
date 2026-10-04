@@ -2,6 +2,8 @@
 name = "jevstral"
 version = "0.1.0"
 description = "A decision model on Ministral 3 8B, trained with the Kev method"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 requires-python = ">=3.12,<3.13"
 dependencies = ["modal>=1.6,<2"]
 
