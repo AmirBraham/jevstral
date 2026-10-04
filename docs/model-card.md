@@ -17,7 +17,7 @@ datasets:
 
 # Jevstral 8B
 
-> **Disclaimer.** Jevstral is an independent personal project. It is not affiliated with, endorsed by or sponsored by Mistral AI. "Mistral" and "Ministral" are names of Mistral AI. This model is an adapter on the open-weight model `mistralai/Ministral-3-8B-Base-2512` (Apache 2.0). Jevstral is also not affiliated with TypeSafe (the company that makes Jev) or with the author of Kev.
+> **Disclaimer.** Jevstral is an independent personal project. It is not affiliated with, endorsed by or sponsored by Mistral AI. "Mistral" and "Ministral" are names of Mistral AI. This model is an adapter on the open-weight model `mistralai/Ministral-3-8B-Base-2512` (Apache 2.0). Jevstral is also not affiliated with TypeSafe, the company that makes Jev.
 
 Jevstral is a decision model. It reads one document (the *state*) and a set of typed questions. It gives a probability for each option of each question, in one forward pass. It does not generate text.
 
@@ -27,7 +27,7 @@ Code: [github.com/AmirBraham/jevstral](https://github.com/AmirBraham/jevstral).
 
 Training and calibration are done. **Use the `stage4/` folder**: it is the final, calibrated model (T = 2.04). The folders `stage1/` to `stage3/` are intermediate checkpoints, kept for reproducibility. They are not calibrated.
 
-The [Decision Index](https://huggingface.co/spaces/multimodalart/jev-decision-index) benchmark against Jev, Kev and Laya is in progress.
+The [Decision Index](https://huggingface.co/spaces/multimodalart/jev-decision-index) benchmark against other decision models is in progress.
 
 ## Model details
 
@@ -40,7 +40,7 @@ The [Decision Index](https://huggingface.co/spaces/multimodalart/jev-decision-in
 | Head | Pointer head: `q` and `k` linear layers from 4,096 to 256. The score of an option is `q(h_decide) · k(h_option_end) / 16`. 2,097,664 weights. |
 | Trained weights | 46,682,624 in total, approximately 0.6 % of the decoder |
 | Language | English |
-| Method | [Kev](https://github.com/jaredpalmer/kev), which follows ["Jev's Architecture Unmasked"](https://archerhume.com/posts/jevs-architecture-unmasked) |
+| Design | Follows ["Jev's Architecture Unmasked"](https://archerhume.com/posts/jevs-architecture-unmasked) |
 
 ### Input format
 
@@ -62,7 +62,7 @@ User text is tokenized with `split_special_tokens=True`. Thus text in the state 
 
 ## Training
 
-All training data comes from Kev at pinned revisions (`jaredpalmer/kev-suites` at `cc4bac80`, and the Kev repository at `84847f0a`). Each file was verified against the SHA-256 in Kev's manifests.
+All training data comes from public decision suites at pinned revisions: the dataset `jaredpalmer/kev-suites` at `cc4bac80` and its source repository at `84847f0a`. Each file was verified against the SHA-256 in its suite manifest.
 
 | Stage | Data | Records | Epochs | Peak LR | Batch | Replay from `decision-v7` |
 |---|---|---|---|---|---|---|
@@ -71,7 +71,7 @@ All training data comes from Kev at pinned revisions (`jaredpalmer/kev-suites` a
 | 3 | `documents-v1` train | 5,219 | 1 | 2e-5 | 2 × 4 | 2,000 |
 | 4 | `hard-v1` and `devtools-v1` train | 11,320 | 1 | 2e-5 | 2 × 4 | 4,000 |
 
-Common settings: cross-entropy loss over the options of each question (soft targets where given), AdamW with weight decay 0.01, one-cycle schedule with 10 % warm-up, gradient clipping at norm 1.0, fp32 weights with bf16 autocast, gradient checkpointing. Training augmentation follows Kev: option shuffle, "none of the above" options (correct and wrong), irrelevant distractors, and minimal pairs in stage 1.
+Common settings: cross-entropy loss over the options of each question (soft targets where given), AdamW with weight decay 0.01, one-cycle schedule with 10 % warm-up, gradient clipping at norm 1.0, fp32 weights with bf16 autocast, gradient checkpointing. Training augmentation: option shuffle, "none of the above" options (correct and wrong), irrelevant distractors, and minimal pairs in stage 1.
 
 Hardware: one NVIDIA H100 80 GB on Modal. Stage 1 took approximately 70 minutes, stage 2 approximately 10 minutes, stage 3 approximately 45 minutes, stage 4 approximately 80 minutes.
 
@@ -81,14 +81,12 @@ Hardware: one NVIDIA H100 80 GB on Modal. Stage 1 took approximately 70 minutes,
 
 The model did not train on these items, but they come from the same sources as the training data. These are not benchmark results.
 
-| Development set | Questions | Jevstral 8B | Kev-4B |
-|---|---|---|---|
-| `decision-v7`: classification and policy decisions | 1,468 | **0.881** | 0.873 |
-| `documents-v1`: long consumer complaints | 920 | **0.891** | 0.891 |
-| `hard-v1`: long policies, trade-offs, multi-hop, judging | 1,083 | **0.810** | 0.786 |
-| `devtools-v1`: code review, commits, flaky tests, safety | 1,074 | 0.710 | **0.739** |
-
-Kev-4B values are from its model card.
+| Development set | Questions | Accuracy |
+|---|---|---|
+| `decision-v7`: classification and policy decisions | 1,468 | 0.881 |
+| `documents-v1`: long consumer complaints | 920 | 0.891 |
+| `hard-v1`: long policies, trade-offs, multi-hop, judging | 1,083 | 0.810 |
+| `devtools-v1`: code review, commits, flaky tests, safety | 1,074 | 0.710 |
 
 ### Calibration
 
@@ -115,7 +113,7 @@ The results of each training stage are in the [training log](https://github.com/
 
 ## Benchmark
 
-In progress: the [Decision Index 0.2.1](https://huggingface.co/spaces/multimodalart/jev-decision-index) (38 benchmarks in five areas), which already scores Jev (57.9), Kev 4B (34.6) and Laya (6.0). Jevstral runs the same suite with the public harness.
+In progress: the [Decision Index 0.2.1](https://huggingface.co/spaces/multimodalart/jev-decision-index) (38 benchmarks in five areas), which already scores other decision models, including Jev (57.9). Jevstral runs the same suite with the public harness.
 
 ## Intended use
 
@@ -145,10 +143,10 @@ The checkpoints use a custom head and input format. Load them with the code in t
 
 ## License
 
-The weights (LoRA adapter, delimiter rows and pointer head) and the code are released under the [Apache 2.0 license](https://github.com/AmirBraham/jevstral/blob/main/LICENSE). The base model, `mistralai/Ministral-3-8B-Base-2512`, is also Apache 2.0. The training datasets have their own licenses; see the Kev model cards and suite manifests.
+The weights (LoRA adapter, delimiter rows and pointer head) and the code are released under the [Apache 2.0 license](https://github.com/AmirBraham/jevstral/blob/main/LICENSE). The base model, `mistralai/Ministral-3-8B-Base-2512`, is also Apache 2.0. The training datasets have their own licenses; see the dataset cards and the suite manifests.
 
 ## Credits
 
-- [Kev](https://github.com/jaredpalmer/kev): the method, the recipe and the data.
+- [Kev](https://github.com/jaredpalmer/kev): the method, the recipe and the data. Jevstral is a port of Kev to a Mistral backbone. It is not affiliated with the author of Kev.
 - ["Jev's Architecture Unmasked"](https://archerhume.com/posts/jevs-architecture-unmasked): the architecture analysis.
 - [Mistral AI](https://mistral.ai): the open-weight base model.

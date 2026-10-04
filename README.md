@@ -1,6 +1,6 @@
 # Jevstral
 
-> **Disclaimer.** Jevstral is an independent personal project. It is not affiliated with, endorsed by or sponsored by Mistral AI. "Mistral" and "Ministral" are names of Mistral AI. This project only uses the open-weight model `mistralai/Ministral-3-8B-Base-2512`, which Mistral AI publishes under the Apache 2.0 license. Jevstral is also not affiliated with TypeSafe (the company that makes Jev) or with the author of Kev.
+> **Disclaimer.** Jevstral is an independent personal project. It is not affiliated with, endorsed by or sponsored by Mistral AI. "Mistral" and "Ministral" are names of Mistral AI. This project only uses the open-weight model `mistralai/Ministral-3-8B-Base-2512`, which Mistral AI publishes under the Apache 2.0 license. Jevstral is also not affiliated with TypeSafe, the company that makes Jev.
 
 Model weights: [AmirBraham/jevstral-8b](https://huggingface.co/AmirBraham/jevstral-8b) on Hugging Face (use the `stage4/` folder).
 
@@ -10,7 +10,7 @@ Example: for a support ticket, the question "Which team?" with the options `bill
 
 ## Status
 
-Training and calibration are done. The [Decision Index](https://huggingface.co/spaces/multimodalart/jev-decision-index) benchmark against Jev, Kev and Laya is in progress.
+Training and calibration are done. The [Decision Index](https://huggingface.co/spaces/multimodalart/jev-decision-index) benchmark against other decision models is in progress.
 
 ## Results
 
@@ -20,14 +20,12 @@ Final model: the calibrated `stage4/` checkpoint.
 
 The model did not train on these items, but they come from the same sources as the training data. These are not benchmark results.
 
-| Development set | Questions | Jevstral 8B | Kev-4B |
-|---|---|---|---|
-| `decision-v7`: classification and policy decisions | 1,468 | **0.881** | 0.873 |
-| `documents-v1`: long consumer complaints | 920 | **0.891** | 0.891 |
-| `hard-v1`: long policies, trade-offs, multi-hop, judging | 1,083 | **0.810** | 0.786 |
-| `devtools-v1`: code review, commits, flaky tests, safety | 1,074 | 0.710 | **0.739** |
-
-Kev-4B values are from its model card.
+| Development set | Questions | Accuracy |
+|---|---|---|
+| `decision-v7`: classification and policy decisions | 1,468 | 0.881 |
+| `documents-v1`: long consumer complaints | 920 | 0.891 |
+| `hard-v1`: long policies, trade-offs, multi-hop, judging | 1,083 | 0.810 |
+| `devtools-v1`: code review, commits, flaky tests, safety | 1,074 | 0.710 |
 
 ### Calibration
 
@@ -57,7 +55,7 @@ The results of each training stage are in [docs/training-log.md](docs/training-l
 
 ## How it works
 
-Jevstral uses the method of [Kev](https://github.com/jaredpalmer/kev), an open model that implements the design described in ["Jev's Architecture Unmasked"](https://archerhume.com/posts/jevs-architecture-unmasked). Kev uses Qwen backbones. Jevstral uses Ministral 3 8B Base.
+Jevstral follows the decision-model design described in ["Jev's Architecture Unmasked"](https://archerhume.com/posts/jevs-architecture-unmasked): a causal language model reads the document and the question once, and a small head scores the options. The backbone is Ministral 3 8B Base.
 
 | Part | Choice |
 |---|---|
@@ -65,10 +63,10 @@ Jevstral uses the method of [Kev](https://github.com/jaredpalmer/kev), an open m
 | Adapter | LoRA, rank 16, on all attention and MLP projections (44.6M weights) |
 | Readout | Pointer head: scores each option against a `<decide>` token. No text generation. |
 | Input | One token row for each question: `<s> <state> document <q> question <opt> option </opt> … <decide>` |
-| Training | Four stages of supervised training with cross-entropy, Kev-4B recipe and Kev data |
+| Training | Four stages of supervised training with cross-entropy |
 | Calibration | One temperature, fitted on 648 questions from datasets that are not used in training |
 
-The training data is Kev's data at pinned revisions. Each file is verified against the SHA-256 in Kev's manifests.
+The training data comes from public decision suites at pinned revisions (see Credits). Each file is verified against the SHA-256 in its suite manifest.
 
 More detail:
 
@@ -125,11 +123,11 @@ uv run modal run modal_app.py::track_finished_stage --stage 1
 
 ## License
 
-Apache 2.0 for the code and the weights. See [LICENSE](LICENSE). The training datasets have their own licenses; see the Kev model cards and suite manifests.
+Apache 2.0 for the code and the weights. See [LICENSE](LICENSE). The training datasets have their own licenses; see the dataset cards and the suite manifests.
 
 ## Credits
 
-- [Kev](https://github.com/jaredpalmer/kev): the method, the training recipe and the data.
-- ["Jev's Architecture Unmasked"](https://archerhume.com/posts/jevs-architecture-unmasked): the architecture analysis that Kev follows.
+- [Kev](https://github.com/jaredpalmer/kev): the method, the training recipe and the data. Jevstral is a port of Kev to a Mistral backbone. It is not affiliated with the author of Kev.
+- ["Jev's Architecture Unmasked"](https://archerhume.com/posts/jevs-architecture-unmasked): the architecture analysis behind the design.
 - [Mistral AI](https://mistral.ai): the open-weight base model, Ministral 3 8B Base (Apache 2.0).
 

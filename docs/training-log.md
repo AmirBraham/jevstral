@@ -15,6 +15,8 @@ All values are accuracy on development splits, before calibration (T = 1). "–"
 
 Stage 2 has no development split for its own skills (dates and missing evidence).
 
+Reference: the final Kev-4B model scores 0.873, 0.891, 0.786 and 0.739 on these four sets (from its model card).
+
 ## Expected calibration error after each stage
 
 | Development set | Stage 1 | Stage 2 | Stage 3 | Stage 4 |
