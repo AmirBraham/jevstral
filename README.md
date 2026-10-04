@@ -8,14 +8,15 @@ Example: for a support ticket, the question "Which team?" with the options `bill
 
 ## Status
 
-Work in progress. Stage 1 of 4 is done.
+Work in progress. Stages 1 and 2 of 4 are done.
 
 | Step | Status |
 |---|---|
 | Code for all stages and calibration | Done |
 | Data download and verification | Done |
 | Stage 1: base | Done. `decision-v7` development: accuracy 0.881, Brier 0.193, ECE 0.065 (before calibration) |
-| Stages 2, 3 and 4 | Not started |
+| Stage 2: dates and missing evidence | Done. `decision-v7` development: accuracy 0.884, Brier 0.191, ECE 0.070 (before calibration). Its own skills have no development split; the benchmarks will measure them. |
+| Stages 3 and 4 | Not started |
 | Calibration | Not started |
 | Benchmarks against Kev | Not started |
 
