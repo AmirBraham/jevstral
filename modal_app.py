@@ -27,6 +27,7 @@ app = modal.App("jevstral")
 
 image = (
     modal.Image.debian_slim(python_version="3.12")
+    .apt_install("git")  # uv fetches the pinned Decision Index harness from GitHub
     .uv_sync(groups=["train", "bench"])
     .env({"HF_HOME": "/cache/hf", "TOKENIZERS_PARALLELISM": "false"})
     .add_local_python_source("jevstral")
