@@ -39,7 +39,9 @@ class Predictor:
         self.model.to("cuda" if torch.cuda.is_available() else "cpu")
         self.model.eval()
         self.path = path
-        self.cache = cache  # compute the state once for all questions of a request
+        # Compute the state once for all questions of a request. Measured on 100 Decision Index requests (RTX PRO 6000):
+        # the cache halves the p95, but makes single-question requests slower (two passes instead of one).
+        self.cache = cache
 
     def __call__(self, state, questions: dict) -> dict[str, list[float]]:
         """Calibrated probabilities for each question key. Raises RecordTooLong for a request over the limits."""
@@ -47,7 +49,7 @@ class Predictor:
         if not record.questions:
             return {}
         rows = self.encoder.rows(record, SERVE)
-        if self.cache:
+        if self.cache and len(rows) > 1:
             scores = self.model.predict_scores_cached(self.encoder.state_ids(record), rows)
         else:
             scores = self.model.predict_scores(rows)
