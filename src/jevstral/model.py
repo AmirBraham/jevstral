@@ -46,6 +46,19 @@ def sample_embeddings(weight: torch.Tensor, count: int) -> torch.Tensor:
     return mean + ((rows - mean).T @ w).T / rows.shape[0] ** 0.5
 
 
+def merged_decoder(decoder: nn.Module, adapter_dir, delimiter_ids: list[int]) -> nn.Module:
+    """Merge the LoRA weights and the delimiter rows into the decoder: W' = W + (alpha / r) B A.
+
+    Merge in the dtype of `decoder` (use fp32), then cast the result if necessary. One rounding step only.
+    """
+    peft = PeftModel.from_pretrained(decoder, str(adapter_dir))
+    rows = next(p for name, p in peft.named_parameters() if "trainable_tokens_delta" in name).detach().clone()
+    merged = peft.merge_and_unload()
+    if not torch.equal(merged.get_input_embeddings().weight[delimiter_ids], rows):
+        raise RuntimeError("the merge did not copy the trained delimiter rows into the embedding table")
+    return merged
+
+
 class PointerHead(nn.Module):
     """Score each option: the dot product of q(<decide>) and k(</opt>)."""
 
@@ -60,10 +73,15 @@ class PointerHead(nn.Module):
 
 
 class DecisionModel(nn.Module):
-    def __init__(self, decoder: nn.Module, delimiter_ids: list[int], pad_id: int, adapter_dir=None):
+    def __init__(
+        self, decoder: nn.Module, delimiter_ids: list[int], pad_id: int, adapter_dir=None, merge: bool = False
+    ):
+        """merge=True (inference only): load the adapter from adapter_dir and merge it into the decoder weights."""
         super().__init__()
-        decoder.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
-        if adapter_dir is None:
+        if merge:
+            self.decoder = merged_decoder(decoder, adapter_dir, delimiter_ids)
+        elif adapter_dir is None:
+            decoder.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
             config = LoraConfig(
                 r=16,
                 lora_alpha=32,
@@ -77,6 +95,7 @@ class DecisionModel(nn.Module):
             with torch.no_grad():
                 self.delimiter_rows().copy_(start)
         else:
+            decoder.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
             self.decoder = PeftModel.from_pretrained(decoder, str(adapter_dir), is_trainable=True)
         self.head = PointerHead(decoder.config.hidden_size)
         self.pad_id = pad_id

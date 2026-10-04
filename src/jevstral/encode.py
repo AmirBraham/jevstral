@@ -23,6 +23,8 @@ class Limits:
 
 SHORT = Limits(max_state=384, max_row=1024)
 LONG = Limits(max_state=7552, max_row=8192)
+# Inference: Kev's serving limits. States longer than LONG were never trained and are not validated.
+SERVE = Limits(max_state=65536, max_row=73728)
 
 
 @dataclass(frozen=True)

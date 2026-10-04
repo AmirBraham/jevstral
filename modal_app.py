@@ -11,6 +11,7 @@ modal run modal_app.py::publish --stage 1
 modal run modal_app.py::publish_model_card
 modal run modal_app.py::track_finished_stage --stage 1
 modal run modal_app.py::evaluate_stage --stage 2
+modal run modal_app.py::check_inference
 """
 
 import subprocess
@@ -93,6 +94,18 @@ def evaluate_stage(stage: int) -> None:
     metrics = evaluate_checkpoint(stage, STAGES[4].dev_files, DATA_DIR, RUNS_DIR)
     runs.commit()
     print(json.dumps(metrics, indent=2))
+
+
+@app.function(image=image, gpu="H100", volumes=VOLUMES, secrets=SECRETS, memory=65536, timeout=HOUR)
+def check_inference() -> None:
+    """Latency of the fp32 and bf16-merged paths, and the difference between their answers."""
+    import json
+
+    from jevstral.inference import inference_report
+
+    report = inference_report(RUNS_DIR / "main" / "stage4" / "final", DATA_DIR)
+    runs.commit()
+    print(json.dumps(report, indent=2))
 
 
 @app.function(image=image, gpu="H100", volumes=VOLUMES, secrets=SECRETS, memory=65536, timeout=2 * HOUR)

@@ -61,8 +61,20 @@ def to_record(raw: dict) -> Record:
     return Record(rid=rid, source=meta.get("source", ""), state=render(raw["state"]), questions=questions)
 
 
-def _question(rid: str, qid: str, q: dict) -> Question:
+def to_request(state, questions: dict) -> Record:
+    """An unlabelled request for inference. Its questions have an empty target."""
+    return Record(
+        rid="request",
+        source="",
+        state=render(state),
+        questions=tuple(_question("request", qid, q, labelled=False) for qid, q in questions.items()),
+    )
+
+
+def _question(rid: str, qid: str, q: dict, labelled: bool = True) -> Question:
     criteria = q.get("criteria")
+    if q["type"] == "choice" and isinstance(criteria, list):
+        criteria = {str(key): None for key in criteria}  # a list names the options without descriptions
     if q["type"] in ("choice", "score") and not criteria:
         raise ValueError(f"{rid}/{qid}: a {q['type']} question needs criteria")
     if q["type"] == "choice":
@@ -79,7 +91,8 @@ def _question(rid: str, qid: str, q: dict) -> Question:
         raise ValueError(f"{rid}/{qid}: unknown question type {q['type']!r}")
     if not keys:
         raise ValueError(f"{rid}/{qid}: the question has no options")
-    return Question(qid, q["type"], render(q["instructions"]), options, keys, _target(rid, qid, q, keys))
+    target = _target(rid, qid, q, keys) if labelled else ()
+    return Question(qid, q["type"], render(q["instructions"]), options, keys, target)
 
 
 def _target(rid: str, qid: str, q: dict, keys: tuple[str, ...]) -> tuple[float, ...]:
