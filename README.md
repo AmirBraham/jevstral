@@ -8,7 +8,7 @@ Example: for a support ticket, the question "Which team?" with the options `bill
 
 ## Status
 
-Work in progress. Stages 1, 2 and 3 of 4 are done.
+Training is done: four stages and calibration. The benchmark is next.
 
 | Step | Status |
 |---|---|
@@ -17,8 +17,8 @@ Work in progress. Stages 1, 2 and 3 of 4 are done.
 | Stage 1: base | Done. `decision-v7` development: accuracy 0.881, Brier 0.193, ECE 0.065 (before calibration) |
 | Stage 2: dates and missing evidence | Done. `decision-v7` development: accuracy 0.884, Brier 0.191, ECE 0.070 (before calibration). Its own skills have no development split; the benchmarks will measure them. |
 | Stage 3: documents | Done. `documents-v1` development: accuracy 0.899 (0.851 before), ECE 0.065. `decision-v7` development: 0.883. |
-| Stage 4 | Not started |
-| Calibration | Not started |
+| Stage 4: skills and developer tools | Done. `hard-v1` development: 0.810 (0.517 before), `devtools-v1`: 0.710 (0.563 before), `documents-v1`: 0.891, `decision-v7`: 0.881. |
+| Calibration | Done. T = 2.04. On 648 held-out questions: ECE 0.141 → 0.043, log loss 1.018 → 0.848, accuracy 0.679 (unchanged). |
 | Fast inference path (bf16 weights, LoRA merged into W, measured latency) | Not started. Required before the benchmark. |
 | Decision Index 0.2.1 benchmark: Jevstral against Jev, Kev and Laya, with accuracy **and** latency | Not started |
 

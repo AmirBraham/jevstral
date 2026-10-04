@@ -31,11 +31,11 @@ Work in progress. This repository holds one folder for each finished training st
 | `stage1/` | Base: `decision-v7` | Done |
 | `stage2/` | Dates and missing evidence: `night2` | Done |
 | `stage3/` | Documents: `documents-v1` (CFPB complaints) | Done |
-| `stage4/` | Skills and developer tools: `hard-v1`, `devtools-v1` | Training |
-| – | Calibration (one temperature) | Not started |
+| `stage4/` | Skills and developer tools: `hard-v1`, `devtools-v1` | Done. **Use this checkpoint.** |
+| `stage4/` | Calibration (one temperature, T = 2.04, in `head.pt`) | Done |
 | – | Decision Index 0.2.1 benchmark, accuracy and latency | Not started |
 
-The checkpoints are not calibrated yet. Their temperature is 1.0. Do not use their probabilities as calibrated values.
+Only `stage4/` is calibrated (T = 2.04). The checkpoints of stages 1 to 3 have T = 1.0. Do not use their probabilities as calibrated values.
 
 ## Model details
 
@@ -81,22 +81,35 @@ All training data comes from Kev at pinned revisions (`jaredpalmer/kev-suites` a
 
 Common settings: cross-entropy loss over the options of each question (soft targets where given), AdamW with weight decay 0.01, one-cycle schedule with 10 % warm-up, gradient clipping at norm 1.0, fp32 weights with bf16 autocast, gradient checkpointing. Training augmentation follows Kev: option shuffle, "none of the above" options (correct and wrong), irrelevant distractors, and minimal pairs in stage 1.
 
-Hardware: one NVIDIA H100 80 GB on Modal. Stage 1 took approximately 70 minutes, stage 2 approximately 10 minutes, stage 3 approximately 40 minutes.
+Hardware: one NVIDIA H100 80 GB on Modal. Stage 1 took approximately 70 minutes, stage 2 approximately 10 minutes, stage 3 approximately 45 minutes, stage 4 approximately 80 minutes.
 
 ## Results so far
 
 Development splits. The model did not train on these items, but they come from the same sources as the training data. These are not benchmark results.
 
-| Development set | Questions | After stage 1 | After stage 2 | After stage 3 | Kev-4B, final |
-|---|---|---|---|---|---|
-| `decision-v7` | 1,468 | 0.881 | 0.884 | 0.883 | 0.873 |
-| `documents-v1` | 920 | – | 0.851 | **0.899** | 0.891 |
-| `hard-v1` | 1,083 | – | 0.517 | – | 0.786 |
-| `devtools-v1` | 1,074 | – | 0.563 | – | 0.739 |
+| Development set | Questions | Stage 1 | Stage 2 | Stage 3 | **Stage 4 (final)** | Kev-4B, final |
+|---|---|---|---|---|---|---|
+| `decision-v7` | 1,468 | 0.881 | 0.884 | 0.883 | **0.881** | 0.873 |
+| `documents-v1` | 920 | – | 0.851 | 0.899 | **0.891** | 0.891 |
+| `hard-v1` | 1,083 | – | 0.517 | – | **0.810** | 0.786 |
+| `devtools-v1` | 1,074 | – | 0.563 | – | **0.710** | 0.739 |
 
-Values are accuracy. "–" means not measured at that stage. Kev-4B values are from its model card. `hard-v1` and `devtools-v1` are the targets of stage 4.
+Values are accuracy. "–" means not measured at that stage. Kev-4B values are from its model card. Stage 4 values are before calibration; calibration does not change accuracy.
 
-Expected calibration error before calibration: 0.086 on `decision-v7` and 0.065 on `documents-v1` after stage 3.
+`hard-v1` by family after stage 4: ambiguous 0.880, judge 0.904, long policy 0.830, multi-hop 0.895, probability 0.735, temporal and numeric 0.621, trade-off 0.780.
+
+`devtools-v1` by source after stage 4: Aegis 0.806, CodeReviewer 0.727, CommitPackFT 0.759, FlakeFlagger 0.680, and two sources that no stage trains on: prompt injection 0.687, When2Call 0.540.
+
+### Calibration
+
+One temperature, fitted on 648 questions from datasets that no stage trains on (`transfer-r3` calibration split, 8 sources, and 200 MMLU-Pro questions from `transfer-v9` development):
+
+| | Before (T = 1) | After (T = 2.04) |
+|---|---|---|
+| Accuracy | 0.679 | 0.679 |
+| Expected calibration error | 0.141 | 0.043 |
+| Log loss | 1.018 | 0.848 |
+| Brier score | 0.454 | 0.418 |
 
 ## Planned benchmark
 
@@ -115,8 +128,8 @@ The [Decision Index 0.2.1](https://huggingface.co/spaces/multimodalart/jev-decis
 
 ## Limitations
 
-- Not calibrated yet (see Status).
-- Weak before stage 4 on temporal and numeric reasoning and on long policies with exceptions (`hard-v1` development: 0.319 and 0.450).
+- One temperature for all tasks. Some tasks can still be over- or underconfident.
+- Temporal and numeric reasoning is the weakest skill (`hard-v1` development: 0.621).
 - Trained states have at most 7,552 tokens. Longer states are not validated.
 - Some training sources (for example BANKING77) also appear in public benchmarks.
 
