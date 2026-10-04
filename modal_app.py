@@ -211,6 +211,49 @@ def committing(volume: modal.Volume, every_seconds: int):
         volume.commit()
 
 
+@contextlib.contextmanager
+def scoring_partial(out: str, every_seconds: int):
+    """Score the results so far every `every_seconds`, into <out>/partial/. A stopped run keeps its last partial
+    scores. A scoring error is printed and does not stop the run."""
+    import threading
+
+    stop = threading.Event()
+    results = BENCH_DIR / out / "results.jsonl"
+    partial = BENCH_DIR / out / "partial"
+
+    def score() -> None:
+        if not results.exists():
+            return
+        text = results.read_text(encoding="utf-8")
+        partial.mkdir(parents=True, exist_ok=True)
+        (partial / "results.jsonl").write_text(text[: text.rfind("\n") + 1], encoding="utf-8")  # complete lines only
+        try:
+            harness(
+                "score",
+                "--results",
+                str(partial / "results.jsonl"),
+                "--suite-dir",
+                str(SUITE_DIR),
+                "--engine",
+                "jevstral",
+                "--out",
+                str(partial),
+            )
+        except subprocess.CalledProcessError as error:
+            print(f"partial scoring failed: {error}", flush=True)
+        bench.commit()
+
+    def loop() -> None:
+        while not stop.wait(every_seconds):
+            score()
+
+    threading.Thread(target=loop, daemon=True).start()
+    try:
+        yield
+    finally:
+        stop.set()
+
+
 def harness(*args: str) -> None:
     """Run one command of the Decision Index harness and stop on failure."""
     import sys
@@ -311,7 +354,7 @@ def bench_sample(n: int = 100, path: str = "bf16-merged") -> None:
 def bench_full(path: str = "bf16-merged") -> None:
     """Run and score the full suite. Resumes from an existing results.jsonl. Start it with start_job (deployed app)."""
     out = f"runs/full-{path}"
-    with committing(bench, every_seconds=600):
+    with committing(bench, every_seconds=600), scoring_partial(out, every_seconds=1800):
         harness(
             "pipeline",
             "--engine",
