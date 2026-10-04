@@ -27,7 +27,8 @@ def start(name: str, config: dict, run_id: str | None = None) -> Tracker:
         return Tracker()
     import wandb
 
-    run = wandb.init(project=PROJECT, name=name, id=run_id or wandb.util.generate_id(), resume="allow", config=config)
+    # A new run gets an ID from wandb. A resumed job passes the ID of its run and continues it.
+    run = wandb.init(project=PROJECT, name=name, id=run_id, resume="allow" if run_id else None, config=config)
     config["wandb_run_id"] = run.id
     return Tracker(run)
 
