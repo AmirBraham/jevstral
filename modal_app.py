@@ -215,7 +215,8 @@ def build_suite(reuse_work: bool = False) -> None:
     The Hugging Face token must have access to the gated dataset cais/hle.
     """
     built = "work/artifacts/benchmark-suite/release-v2-rebuilt"
-    reuse = ["--skip-download", "--skip-normalize"] if reuse_work else []
+    # Downloads already skip files that exist with the right SHA-256, so only the normalization is skipped.
+    reuse = ["--skip-normalize"] if reuse_work else []
     with committing(bench, every_seconds=300):
         harness("suite", "rebuild", "--work", "work", *reuse)
     harness(
