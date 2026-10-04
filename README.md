@@ -12,6 +12,7 @@ The local computer runs only the `modal` command. All data, model and GPU work r
 uv sync
 uv run modal setup
 uv run modal secret create huggingface HF_TOKEN=<your token>
+uv run modal secret create wandb WANDB_API_KEY=<your key>
 ```
 
 ## Train
@@ -38,6 +39,14 @@ uv run modal run modal_app.py::publish --stage 1
 ```
 
 This uploads `final/`, `metrics.json` and `log.jsonl` of the stage to the folder `stage1/` of the private repository `<user>/jevstral-8b`.
+
+## Monitor
+
+Training sends the loss, learning rate and gradient norm to the Weights & Biases project `jevstral`, and the development metrics at the end of each stage. Stage 1 trained before this was added. To send its log to W&B:
+
+```
+uv run modal run modal_app.py::track_finished_stage --stage 1
+```
 
 ## Documents
 

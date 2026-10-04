@@ -11,7 +11,7 @@ from pathlib import Path
 
 import torch
 
-from . import checkpoint, suites
+from . import checkpoint, suites, tracking
 from .augment import augment, minimal_pair
 from .encode import LONG, Encoder, RecordTooLong, Row
 from .metrics import summarize
@@ -171,6 +171,9 @@ def run_stage(
         "git_commit": git_commit,
         "smoke": smoke,
     }
+    run_id = json.loads((resume_dir / "config.json").read_text()).get("wandb_run_id") if resuming else None
+    name = f"stage{stage.number}" + ("-smoke" if smoke else "")
+    tracker = tracking.start(name, config, run_id)
     print(json.dumps(config, indent=2), flush=True)
 
     model.train()
@@ -214,6 +217,7 @@ def run_stage(
                     log.write(json.dumps(entry) + "\n")
                     log.flush()
                     print(entry, flush=True)
+                    tracker.log(entry, step=step)
                     losses = []
                 if step == total_steps:
                     break
@@ -234,5 +238,6 @@ def run_stage(
     metrics = evaluate(model, encoder, stage.dev_files, data_dir, SMOKE_DEV_RECORDS if smoke else None)
     (out / "metrics.json").write_text(json.dumps(metrics, indent=2))
     print(json.dumps(metrics, indent=2), flush=True)
+    tracker.finish(metrics)
     persist()
     return metrics

@@ -7,6 +7,7 @@ modal run --detach modal_app.py::train --stage 1
 modal run --detach modal_app.py::calibrate
 modal run modal_app.py::check_hub
 modal run modal_app.py::publish --stage 1
+modal run modal_app.py::track_finished_stage --stage 1
 """
 
 import subprocess
@@ -31,6 +32,7 @@ DATA_DIR = Path("/data")
 RUNS_DIR = Path("/runs")
 VOLUMES = {"/cache": hf_cache, str(DATA_DIR): data, str(RUNS_DIR): runs}
 SECRETS = [modal.Secret.from_name("huggingface")]
+WANDB = modal.Secret.from_name("wandb")
 HOUR = 3600
 
 
@@ -65,7 +67,7 @@ def inspect_data() -> None:
     image=image,
     gpu="H100",
     volumes=VOLUMES,
-    secrets=SECRETS,
+    secrets=[*SECRETS, WANDB],
     memory=65536,
     # No `retries`: Modal reruns preempted jobs itself, and a retry after an exception in our code fails again.
     timeout=8 * HOUR,
@@ -98,6 +100,14 @@ def upload_stage(stage: int) -> None:
     from jevstral.publish import publish_stage
 
     print("uploaded:", publish_stage(stage, RUNS_DIR))
+
+
+@app.function(image=image, volumes={str(RUNS_DIR): runs}, secrets=[WANDB], timeout=600)
+def track_finished_stage(stage: int) -> None:
+    """Send the log and metrics of a stage that trained without W&B (stage 1) to a W&B run."""
+    from jevstral.tracking import upload_finished_stage
+
+    print("run:", upload_finished_stage(RUNS_DIR / "main" / f"stage{stage}"))
 
 
 def local_git_commit() -> str:

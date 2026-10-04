@@ -7,7 +7,7 @@ dependencies = ["modal>=1.6,<2"]
 
 [dependency-groups]
 # Installed only in the Modal image (modal_app.py), not on the local computer.
-train = ["torch==2.14.1", "transformers==5.18.0", "peft==0.21.2"]
+train = ["torch==2.14.1", "transformers==5.18.0", "peft==0.21.2", "wandb>=0.22"]
 dev = ["ruff>=0.14"]
 
 [build-system]
