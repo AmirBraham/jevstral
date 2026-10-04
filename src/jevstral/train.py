@@ -28,7 +28,8 @@ from .stages import (
 )
 
 SMOKE_RECORDS = 64
-SMOKE_STEPS = 10
+# OneCycleLR divides by zero if the warm-up (WARMUP_FRACTION * total steps) is 1 step or less.
+SMOKE_STEPS = 20
 SMOKE_DEV_RECORDS = 32
 
 

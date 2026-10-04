@@ -324,7 +324,7 @@ The local computer runs only the `modal` command. It does not install torch, and
 
 ### 10.3 Smoke run
 
-Before each stage, run `train_stage` with `smoke=True`. The smoke run uses 64 records and 10 optimizer steps. It must finish without errors before the full stage starts.
+Before each stage, run `train_stage` with `smoke=True`. The smoke run uses 64 records and 20 optimizer steps. It must finish without errors before the full stage starts.
 
 ### 10.4 Commands
 

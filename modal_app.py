@@ -65,8 +65,8 @@ def inspect_data() -> None:
     volumes=VOLUMES,
     secrets=SECRETS,
     memory=65536,
+    # No `retries`: Modal reruns preempted jobs itself, and a retry after an exception in our code fails again.
     timeout=8 * HOUR,
-    retries=modal.Retries(max_retries=3, initial_delay=0.0),
 )
 def train_stage(stage: int, smoke: bool, git_commit: str) -> None:
     from jevstral.stages import STAGES

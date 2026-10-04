@@ -31,7 +31,7 @@ One optimizer step uses 8 records. Long records do not fit 8 in one pass, so we 
 
 ## Smoke run
 
-Before each stage, a smoke run trains 10 steps on 64 records. It finds load and memory errors in a few minutes, before a long run starts.
+Before each stage, a smoke run trains 20 steps on 64 records. It finds load and memory errors in a few minutes, before a long run starts.
 
 ## Resume
 
