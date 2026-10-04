@@ -19,7 +19,7 @@ Training is done: four stages and calibration. The benchmark is next.
 | Stage 3: documents | Done. `documents-v1` development: accuracy 0.899 (0.851 before), ECE 0.065. `decision-v7` development: 0.883. |
 | Stage 4: skills and developer tools | Done. `hard-v1` development: 0.810 (0.517 before), `devtools-v1`: 0.710 (0.563 before), `documents-v1`: 0.891, `decision-v7`: 0.881. |
 | Calibration | Done. T = 2.04. On 648 held-out questions: ECE 0.141 → 0.043, log loss 1.018 → 0.848, accuracy 0.679 (unchanged). |
-| Fast inference path (bf16 weights, LoRA merged into W, measured latency) | Not started. Required before the benchmark. |
+| Fast inference path (bf16 weights, LoRA merged into W) | Done. One H100, one request at a time: median 27 ms for short requests (121 tokens), 37 ms for long documents (819 tokens). The fp32 training path takes 114 ms and 124 ms. Against fp32 on 567 development questions: mean probability difference 0.003, maximum 0.034, 3 changed answers. |
 | Decision Index 0.2.1 benchmark: Jevstral against Jev, Kev and Laya, with accuracy **and** latency | Not started |
 
 ## How it works
