@@ -29,6 +29,16 @@ Do stages 2, 3 and 4 in the same way. Then fit the temperature:
 uv run modal run --detach modal_app.py::calibrate
 ```
 
+## Back up to Hugging Face
+
+The `huggingface` secret needs a token with write access. After a stage finishes:
+
+```
+uv run modal run modal_app.py::publish --stage 1
+```
+
+This uploads `final/`, `metrics.json` and `log.jsonl` of the stage to the folder `stage1/` of the private repository `<user>/jevstral-8b`.
+
 ## Documents
 
 - `docs/specs/`: design.

@@ -5,6 +5,8 @@ modal run modal_app.py::inspect_data
 modal run modal_app.py::train --stage 1 --smoke
 modal run --detach modal_app.py::train --stage 1
 modal run --detach modal_app.py::calibrate
+modal run modal_app.py::check_hub
+modal run modal_app.py::publish --stage 1
 """
 
 import subprocess
@@ -82,6 +84,22 @@ def calibrate_stage4() -> None:
     run_calibration(DATA_DIR, RUNS_DIR, persist=persist)
 
 
+@app.function(image=image, secrets=SECRETS, timeout=600)
+def check_hub() -> None:
+    """Verify that the Hugging Face token can write: create the private repository if it does not exist."""
+    from jevstral.publish import ensure_repo, token_report
+
+    print(token_report())
+    print("repository ready:", ensure_repo())
+
+
+@app.function(image=image, volumes={str(RUNS_DIR): runs}, secrets=SECRETS, timeout=HOUR)
+def upload_stage(stage: int) -> None:
+    from jevstral.publish import publish_stage
+
+    print("uploaded:", publish_stage(stage, RUNS_DIR))
+
+
 def local_git_commit() -> str:
     commit = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()
     dirty = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True, check=True).stdout.strip()
@@ -96,3 +114,8 @@ def train(stage: int, smoke: bool = False) -> None:
 @app.local_entrypoint()
 def calibrate() -> None:
     calibrate_stage4.remote()
+
+
+@app.local_entrypoint()
+def publish(stage: int) -> None:
+    upload_stage.remote(stage)
