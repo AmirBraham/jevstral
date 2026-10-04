@@ -21,6 +21,15 @@ def token_report() -> str:
     return f"token '{auth.get('displayName')}', role {auth.get('role')}"
 
 
+def publish_card(card: str) -> str:
+    """Upload the model card as README.md of the repository."""
+    repo_id = ensure_repo()
+    commit = HfApi().upload_file(
+        path_or_fileobj=card.encode(), path_in_repo="README.md", repo_id=repo_id, commit_message="Update model card"
+    )
+    return commit.commit_url
+
+
 def publish_stage(stage: int, runs_dir: Path) -> str:
     """Upload main/stage{N} (the final checkpoint, metrics and log) to the folder stage{N} of the repository."""
     folder = runs_dir / "main" / f"stage{stage}"

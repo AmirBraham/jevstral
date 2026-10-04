@@ -7,6 +7,7 @@ modal run --detach modal_app.py::train --stage 1
 modal run --detach modal_app.py::calibrate
 modal run modal_app.py::check_hub
 modal run modal_app.py::publish --stage 1
+modal run modal_app.py::publish_model_card
 modal run modal_app.py::track_finished_stage --stage 1
 modal run modal_app.py::evaluate_stage --stage 2
 """
@@ -109,6 +110,13 @@ def check_hub() -> None:
     print("repository ready:", ensure_repo())
 
 
+@app.function(image=image, secrets=SECRETS, timeout=600)
+def upload_card(card: str) -> None:
+    from jevstral.publish import publish_card
+
+    print("model card:", publish_card(card))
+
+
 @app.function(image=image, volumes={str(RUNS_DIR): runs}, secrets=SECRETS, timeout=HOUR)
 def upload_stage(stage: int) -> None:
     from jevstral.publish import publish_stage
@@ -143,3 +151,8 @@ def calibrate() -> None:
 @app.local_entrypoint()
 def publish(stage: int) -> None:
     upload_stage.remote(stage)
+
+
+@app.local_entrypoint()
+def publish_model_card() -> None:
+    upload_card.remote(Path("docs/model-card.md").read_text())
