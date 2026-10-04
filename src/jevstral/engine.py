@@ -22,10 +22,12 @@ class JevstralEngine(Engine):
         "questions of the request; excludes model loading."
     )
 
-    def __init__(self, checkpoint: str = "/runs/main/stage4/final", path: str = "bf16-merged", **options):
+    def __init__(
+        self, checkpoint: str = "/runs/main/stage4/final", path: str = "bf16-merged", cache: bool = True, **options
+    ):
         super().__init__(**options)
         directory = Path(checkpoint)
-        self.predictor = Predictor(directory, path)
+        self.predictor = Predictor(directory, path, cache=cache)
         config = json.loads((directory / "config.json").read_text())
         temperature = torch.load(directory / "head.pt", map_location="cpu", weights_only=True)["temperature"]
         self.provenance = {
@@ -35,6 +37,7 @@ class JevstralEngine(Engine):
             "base_revision": config["base_revision"],
             "git_commit": config["git_commit"],
             "inference_path": path,
+            "state_cache": cache,
             "temperature": temperature,
             "limits": {"max_state_tokens": SERVE.max_state, "max_row_tokens": SERVE.max_row},
             "policy": "Each question is one row with the full state. Requests over the limits are refused, never cut.",

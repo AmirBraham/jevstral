@@ -27,7 +27,7 @@ class Predictor:
     path "fp32": the training path, fp32 decoder with a separate LoRA adapter (the reference).
     """
 
-    def __init__(self, directory: Path, path: str = "bf16-merged"):
+    def __init__(self, directory: Path, path: str = "bf16-merged", cache: bool = True):
         if path not in PATHS:
             raise ValueError(f"path must be one of {PATHS}")
         self.encoder = Encoder(load_tokenizer())
@@ -39,6 +39,7 @@ class Predictor:
         self.model.to("cuda" if torch.cuda.is_available() else "cpu")
         self.model.eval()
         self.path = path
+        self.cache = cache  # compute the state once for all questions of a request
 
     def __call__(self, state, questions: dict) -> dict[str, list[float]]:
         """Calibrated probabilities for each question key. Raises RecordTooLong for a request over the limits."""
@@ -46,7 +47,10 @@ class Predictor:
         if not record.questions:
             return {}
         rows = self.encoder.rows(record, SERVE)
-        scores = self.model.predict_scores(rows)
+        if self.cache:
+            scores = self.model.predict_scores_cached(self.encoder.state_ids(record), rows)
+        else:
+            scores = self.model.predict_scores(rows)
         return {q.qid: s.softmax(-1).tolist() for q, s in zip(record.questions, scores, strict=True)}
 
     def synchronize(self) -> None:
@@ -100,7 +104,7 @@ def inference_report(directory: Path, data_dir: Path) -> dict:
     report: dict = {"latency": {}, "parity": {}}
     answers = {}
     for path in PATHS:
-        predictor = Predictor(directory, path)
+        predictor = Predictor(directory, path, cache=False)
         report["latency"][path] = {"short": _latency(predictor, short), "long": _latency(predictor, long)}
         answers[path] = _answers(predictor, parity_records)
         del predictor
@@ -119,4 +123,50 @@ def inference_report(directory: Path, data_dir: Path) -> dict:
         "changed_answers": flips,
     }
     (directory.parent / "inference.json").write_text(json.dumps(report, indent=2))
+    return report
+
+
+def _compare(reference: list[list[float]], other: list[list[float]]) -> dict:
+    differences = [max(abs(a - b) for a, b in zip(p, q, strict=True)) for p, q in zip(reference, other, strict=True)]
+    flips = sum(
+        max(range(len(p)), key=p.__getitem__) != max(range(len(q)), key=q.__getitem__)
+        for p, q in zip(reference, other, strict=True)
+    )
+    return {
+        "questions": len(differences),
+        "max_abs_probability_difference": round(max(differences), 4),
+        "mean_abs_probability_difference": round(statistics.mean(differences), 5),
+        "changed_answers": flips,
+    }
+
+
+def cache_report(directory: Path, data_dir: Path, requests: list[dict]) -> dict:
+    """Compare the state cache with the plain path (both bf16-merged): answers and latency on `requests`, and
+    answers on development records."""
+    predictor = Predictor(directory, "bf16-merged", cache=False)
+    development = [r for path in STAGES[4].dev_files for r in _sample(path, data_dir, PARITY_RECORDS, seed=1)]
+    report: dict = {"latency": {}, "parity": {}}
+    answers: dict = {}
+    for cache in (False, True):
+        predictor.cache = cache
+        name = "cache" if cache else "no-cache"
+        answers[name] = (_answers(predictor, requests), _answers(predictor, development))
+        times = []
+        for raw in requests:
+            predictor.synchronize()
+            start = time.perf_counter()
+            predictor(raw["state"], raw["questions"])
+            predictor.synchronize()
+            times.append((time.perf_counter() - start) * 1000)
+        times.sort()
+        report["latency"][name] = {
+            "requests": len(times),
+            "median_ms": round(statistics.median(times), 1),
+            "mean_ms": round(statistics.mean(times), 1),
+            "p95_ms": round(times[int(0.95 * (len(times) - 1))], 1),
+            "max_ms": round(times[-1], 1),
+        }
+    report["parity"]["benchmark_requests"] = _compare(answers["no-cache"][0], answers["cache"][0])
+    report["parity"]["development"] = _compare(answers["no-cache"][1], answers["cache"][1])
+    (directory.parent / "cache.json").write_text(json.dumps(report, indent=2))
     return report

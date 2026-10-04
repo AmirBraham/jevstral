@@ -12,6 +12,7 @@ modal run modal_app.py::publish_model_card
 modal run modal_app.py::track_finished_stage --stage 1
 modal run modal_app.py::evaluate_stage --stage 2
 modal run modal_app.py::check_inference
+modal run modal_app.py::check_cache
 python modal_app.py build_suite      (CPU, hours; needs access to cais/hle)
 modal run modal_app.py::bench_sample --n 100
 python modal_app.py bench_full       (only after the sample, with an approved cost)
@@ -125,6 +126,23 @@ def check_inference() -> None:
     from jevstral.inference import inference_report
 
     report = inference_report(RUNS_DIR / "main" / "stage4" / "final", DATA_DIR)
+    runs.commit()
+    print(json.dumps(report, indent=2))
+
+
+@app.function(
+    image=image, gpu=BENCH_GPU, volumes={**VOLUMES, str(BENCH_DIR): bench}, secrets=SECRETS, memory=65536, timeout=HOUR
+)
+def check_cache(n: int = 100) -> None:
+    """State cache against the plain path, on the Decision Index sample of n requests and on development records."""
+    import gzip
+    import json
+
+    from jevstral.inference import cache_report
+
+    with gzip.open(BENCH_DIR / f"sample-{n}.jsonl.gz", "rt") as file:
+        requests = [json.loads(line) for line in file if line.strip()]
+    report = cache_report(FINAL, DATA_DIR, requests)
     runs.commit()
     print(json.dumps(report, indent=2))
 
