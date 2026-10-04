@@ -1,0 +1,25 @@
+<!doctype html>
+<meta charset="utf-8">
+<link rel="stylesheet" href="style.css">
+<div class="fig" style="height: 600px">
+  <h1>Decision Index 0.2.1</h1>
+  <p class="sub">Chance-corrected score over 38 benchmarks in five areas: 0 is random guessing, 100 is perfect. Higher is better.</p>
+  <svg id="chart"></svg>
+  <p class="foot">Other models: public leaderboard (clef-evals.workers-ai-mle.workers.dev), data of 2026-10-01. Clef scores are self-reported by their authors.</p>
+</div>
+<script src="chart.js"></script>
+<script>
+barChart({
+  max: 70, ticks: [0, 10, 20, 30, 40, 50, 60, 70],
+  rows: [
+    { label: "Clef · 27B", value: 61.2, note: "self-reported" },
+    { label: "Jev · closed", value: 57.9 },
+    { label: "Clef-flash · 9B", value: 57.1, note: "self-reported" },
+    { label: "AutoJev · 27B", value: 56.4 },
+    { label: "Jevstral · 8B", accent: true, pending: true, note: "Run in progress. The score comes at the end of the run." },
+    { label: "Kev · 9B", value: 38.5 },
+    { label: "Kev · 4B", value: 34.6 },
+    { label: "Laya · 0.4B", value: 6.0 },
+  ],
+});
+</script>

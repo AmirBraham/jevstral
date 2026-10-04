@@ -1,22 +1,64 @@
 # Jevstral
 
-> **Disclaimer.** Jevstral is an independent personal project. It is not affiliated with, endorsed by or sponsored by Mistral AI. "Mistral" and "Ministral" are names of Mistral AI. This project only uses the open-weight model `mistralai/Ministral-3-8B-Base-2512`, which Mistral AI publishes under the Apache 2.0 license. Jevstral is also not affiliated with TypeSafe, the company that makes Jev.
+> **Disclaimer.** Jevstral is an independent personal project. It is not affiliated with, endorsed by or sponsored by Mistral AI. "Mistral" and "Ministral" are names of Mistral AI. Jevstral uses the open-weight model `mistralai/Ministral-3-8B-Base-2512`, which Mistral AI publishes under the Apache 2.0 license. Jevstral is also not affiliated with TypeSafe, the company that makes Jev.
 
-Model weights: [AmirBraham/jevstral-8b](https://huggingface.co/AmirBraham/jevstral-8b) on Hugging Face (use the `stage4/` folder).
+Jevstral is a decision model. It reads a document and a set of typed questions, and it gives a calibrated probability for each option of each question. It does this in one forward pass. It does not generate text.
 
-Jevstral is a decision model. It reads one document and a set of typed questions. It gives a probability for each option of each question. It does not generate text.
+Example: a support ticket and the question "Which team?" with the options `billing`, `shipping` and `returns`. Jevstral gives one probability for each option. Software can then act on a threshold. For example: if p ≥ 0.9, send the ticket to the team automatically; if not, send it to a person.
 
-Example: for a support ticket, the question "Which team?" with the options `billing`, `shipping` and `returns` gets one probability for each option. Software can then act on a threshold, for example: if p ≥ 0.9, route the ticket automatically.
+- **Weights:** [AmirBraham/jevstral-8b](https://huggingface.co/AmirBraham/jevstral-8b) on Hugging Face. Use the `stage4/` folder.
+- **License:** Apache 2.0.
 
-## Status
+## Contents
 
-Training and calibration are done. The [Decision Index](https://huggingface.co/spaces/multimodalart/jev-decision-index) benchmark against other decision models is in progress.
+1. [How it works](#1-how-it-works)
+2. [Training](#2-training)
+3. [Results](#3-results)
+4. [Benchmarks](#4-benchmarks)
+5. [Use the model](#5-use-the-model)
+6. [Reproduce the training](#6-reproduce-the-training)
+7. [Documents](#7-documents)
+8. [License](#8-license)
+9. [Credits](#9-credits)
 
-## Results
+## 1. How it works
 
-Final model: the calibrated `stage4/` checkpoint.
+![How Jevstral answers a question](docs/images/architecture.png)
 
-### Accuracy on development splits
+Jevstral follows the decision-model design described in ["Jev's Architecture Unmasked"](https://archerhume.com/posts/jevs-architecture-unmasked).
+
+1. **Token row.** Each question becomes one row of tokens: the document, the question and the options. Five reserved Mistral tokens mark the parts of the row. User text cannot make these tokens.
+2. **Decoder.** The row goes through the Ministral 3 8B text decoder. Its 34 layers are frozen. LoRA adapters (rank 16) change the attention and MLP projections.
+3. **Pointer head.** The head reads the hidden state at the end of each option and at the `<decide>` token. It gives one score for each option: `q(h_decide) · k(h_option) / √256`.
+4. **Probabilities.** A softmax of `score / T` gives the probabilities. The temperature T = 2.04 makes the probabilities match how often the model is correct.
+5. **State cache.** For a request with more than one question, the model reads the document once and uses it again for each question.
+
+Each part has a short explanation in [`docs/concepts/`](docs/concepts/).
+
+## 2. Training
+
+![What we did](docs/images/training.png)
+
+| Step | Data | What the model learns | Time on one H100 |
+|---|---|---|---|
+| Stage 1 · Base | 12,576 records: ten classification datasets, generated policy cases and rule structures | The format and the basic decision skill | 70 min |
+| Stage 2 · Dates and missing evidence | 1,425 records + 2,000 replayed | Date arithmetic, and a uniform answer when the document cannot decide | 10 min |
+| Stage 3 · Documents | 5,219 consumer complaints + 2,000 replayed | Long, real documents | 45 min |
+| Stage 4 · Skills and tools | 11,320 records + 4,000 replayed | Long policies, trade-offs, multi-hop reasoning, judging, developer tools | 80 min |
+| Calibration | 648 questions from datasets that no stage trains on | One temperature, T = 2.04 | 5 min |
+
+- **Data.** All training data comes from public decision suites at pinned revisions (see [Credits](#9-credits)). Each file is checked against its SHA-256 before training.
+- **Replay.** Stages 2, 3 and 4 add records from stage 1. This prevents the model from forgetting its earlier skills.
+- **Settings.** Cross-entropy loss, AdamW, one-cycle learning rate, gradient clipping at 1.0, fp32 weights with bf16 computation.
+- **Trained weights.** 46.7 million: LoRA (44.6M), the pointer head (2.1M) and five delimiter embeddings. The 8 billion base weights do not change.
+
+The results of each stage are in [docs/training-log.md](docs/training-log.md).
+
+## 3. Results
+
+These results are for the final model: the calibrated `stage4/` checkpoint.
+
+### Accuracy
 
 The model did not train on these items, but they come from the same sources as the training data. These are not benchmark results.
 
@@ -27,9 +69,11 @@ The model did not train on these items, but they come from the same sources as t
 | `hard-v1`: long policies, trade-offs, multi-hop, judging | 1,083 | 0.810 |
 | `devtools-v1`: code review, commits, flaky tests, safety | 1,074 | 0.710 |
 
+![What stage 4 adds](docs/images/stage4.png)
+
 ### Calibration
 
-One temperature, T = 2.04, fitted on 648 questions from datasets that no training stage uses:
+One temperature, fitted on 648 questions from datasets that no training stage uses. Calibration changes the confidence, not the answers.
 
 | | Before | After |
 |---|---|---|
@@ -37,97 +81,117 @@ One temperature, T = 2.04, fitted on 648 questions from datasets that no trainin
 | Log loss | 1.018 | **0.848** |
 | Accuracy | 0.679 | 0.679 |
 
-Calibration changes the confidence, not the answers.
+### Inference
 
-### Latency
+The fast inference path uses bf16 weights with LoRA merged into the base weights. Against the fp32 training path on 567 development questions, the mean probability difference is 0.003, and 3 answers change.
 
-One request at a time, bf16 weights with LoRA merged into the base weights:
+## 4. Benchmarks
 
-| GPU | Requests | Median | p95 |
-|---|---|---|---|
-| RTX PRO 6000 (the Decision Index GPU) | 100 Decision Index requests | **45.5 ms** | 1,098 ms |
-| H100 | 100 short development requests (121 tokens) | 27 ms | 33 ms |
-| H100 | 100 long documents (819 tokens) | 37 ms | 190 ms |
+The [Decision Index 0.2.1](https://huggingface.co/spaces/multimodalart/jev-decision-index) is a public benchmark for decision models: 38 benchmarks in five areas, about 150,000 requests. Jevstral runs it with the [public harness](https://github.com/apolinario/decision-index) on one NVIDIA RTX PRO 6000, the GPU that the leaderboard uses.
 
-Slow requests have many questions on one long document. Against the fp32 training path on 567 development questions, the bf16 path has a mean probability difference of 0.003 and changes 3 answers.
+**Status: the full run is in progress.** The chart shows the score when the run is complete.
 
-The results of each training stage are in [docs/training-log.md](docs/training-log.md).
+![Decision Index 0.2.1](docs/images/decision-index.png)
 
-## How it works
+![Median latency for one request](docs/images/latency.png)
 
-Jevstral follows the decision-model design described in ["Jev's Architecture Unmasked"](https://archerhume.com/posts/jevs-architecture-unmasked): a causal language model reads the document and the question once, and a small head scores the options. The backbone is Ministral 3 8B Base.
+Points to know when you compare the results:
 
-| Part | Choice |
-|---|---|
-| Backbone | `mistralai/Ministral-3-8B-Base-2512`, text decoder only, frozen |
-| Adapter | LoRA, rank 16, on all attention and MLP projections (44.6M weights) |
-| Readout | Pointer head: scores each option against a `<decide>` token. No text generation. |
-| Input | One token row for each question: `<s> <state> document <q> question <opt> option </opt> … <decide>` |
-| Training | Four stages of supervised training with cross-entropy |
-| Calibration | One temperature, fitted on 648 questions from datasets that are not used in training |
+- **Latency.** The Jevstral value comes from a 100-request sample of the suite. Jev is a hosted API, so its time includes the network.
+- **Training overlap.** BANKING77 is in the Decision Index and in the training data of Jevstral and Kev.
+- **Calibration data.** 200 MMLU-Pro questions were used to fit the temperature. MMLU-Pro is also in the Decision Index. The temperature does not change the answers.
+- **Self-reported scores.** The Clef scores come from their authors.
 
-The training data comes from public decision suites at pinned revisions (see Credits). Each file is verified against the SHA-256 in its suite manifest.
+## 5. Use the model
 
-More detail:
+You need an NVIDIA GPU with 24 GB of memory or more, and [uv](https://docs.astral.sh/uv/).
 
-- `docs/specs/`: the design.
-- `docs/concepts/`: how each part works (decision model, encoding, augmentation, pointer head, LoRA, training stages, calibration).
-- `docs/training-log.md`: the results of each training stage.
+```
+git clone https://github.com/AmirBraham/jevstral && cd jevstral
+uv sync --group train
+uv run hf download AmirBraham/jevstral-8b --include "stage4/final/*" --local-dir weights
+```
 
-## Setup
+```python
+from pathlib import Path
+from jevstral.inference import Predictor
+
+predictor = Predictor(Path("weights/stage4/final"))  # also downloads Ministral 3 8B Base (approximately 17 GB)
+probabilities = predictor(
+    "I was charged twice for order 1182. Please refund one of the charges.",
+    {
+        "team": {
+            "type": "choice",
+            "instructions": "Which team should handle this?",
+            "criteria": {"billing": "Charges and refunds", "shipping": "Deliveries", "returns": "Exchanges"},
+        },
+        "urgent": {"type": "noul", "instructions": "Does this need a reply today?"},
+    },
+)
+print(probabilities)  # {"team": [p_billing, p_shipping, p_returns], "urgent": [p_no, p_yes]}
+```
+
+Question types:
+
+| Type | Options | Output |
+|---|---|---|
+| `choice` | The named criteria | One probability for each criterion, in order |
+| `noul` | `no`, `yes` | Two probabilities |
+| `score` | Ordered levels | One probability for each level |
+
+## 6. Reproduce the training
 
 The local computer runs only the `modal` command. All data, model and GPU work runs on [Modal](https://modal.com).
 
 ```
 uv sync
 uv run modal setup
-uv run modal secret create huggingface HF_TOKEN=<your token>
-uv run modal secret create wandb WANDB_API_KEY=<your key>
+uv run modal secret create huggingface HF_TOKEN=<token with write access>
+uv run modal secret create wandb WANDB_API_KEY=<key>
 ```
 
-## Train
+Prepare the data and do a short test run:
 
 ```
 uv run modal run modal_app.py::prepare_data
 uv run modal run modal_app.py::inspect_data
 uv run modal run modal_app.py::train --stage 1 --smoke
+```
+
+Train the four stages and fit the temperature. `modal deploy` puts the app on Modal. Each command starts a job on the deployed app and returns at once, so the job does not depend on the local computer. Deploy again after each code change.
+
+```
 uv run modal deploy modal_app.py
-uv run python modal_app.py train 1
-```
-
-`modal deploy` puts the app on Modal. `python modal_app.py train N` starts the stage on the deployed app and returns at once. The job does not depend on the local computer or its network. Deploy again after each code change.
-
-Do stages 2, 3 and 4 in the same way. Then fit the temperature:
-
-```
+uv run python modal_app.py train 1     # then 2, 3 and 4, each after the previous stage
 uv run python modal_app.py calibrate
 ```
 
-## Back up to Hugging Face
-
-The `huggingface` secret needs a token with write access. After a stage finishes:
+Back up a stage to Hugging Face, and run the Decision Index:
 
 ```
-uv run modal run modal_app.py::publish --stage 1
+uv run modal run modal_app.py::publish --stage 4
+uv run python modal_app.py build_suite
+uv run modal run modal_app.py::bench_sample --n 100
+uv run python modal_app.py bench_full
 ```
 
-This uploads `final/`, `metrics.json` and `log.jsonl` of the stage to the folder `stage1/` of the repository `<user>/jevstral-8b`. The job creates the repository as private if it does not exist.
+Training sends its loss, learning rate and gradient norm to the Weights & Biases project `jevstral`.
 
-## Monitor
+To render the figures in this README again: `scripts/render-figures.sh` (needs Google Chrome). The figure sources are in `docs/images/src/`.
 
-Training sends the loss, learning rate and gradient norm to the Weights & Biases project `jevstral`, and the development metrics at the end of each stage. Stage 1 trained before this was added. To send its log to W&B:
+## 7. Documents
 
-```
-uv run modal run modal_app.py::track_finished_stage --stage 1
-```
+- [`docs/concepts/`](docs/concepts/): how each part works (decision model, encoding, augmentation, pointer head, LoRA, training stages, calibration).
+- [`docs/training-log.md`](docs/training-log.md): the results of each training stage.
+- [`docs/specs/`](docs/specs/): the design.
 
-## License
+## 8. License
 
 Apache 2.0 for the code and the weights. See [LICENSE](LICENSE). The training datasets have their own licenses; see the dataset cards and the suite manifests.
 
-## Credits
+## 9. Credits
 
 - [Kev](https://github.com/jaredpalmer/kev): the method, the training recipe and the data. Jevstral is a port of Kev to a Mistral backbone. It is not affiliated with the author of Kev.
 - ["Jev's Architecture Unmasked"](https://archerhume.com/posts/jevs-architecture-unmasked): the architecture analysis behind the design.
+- [Decision Index](https://github.com/apolinario/decision-index): the benchmark suite and harness.
 - [Mistral AI](https://mistral.ai): the open-weight base model, Ministral 3 8B Base (Apache 2.0).
-

@@ -1,0 +1,38 @@
+/* Shared style of the README figures. Colors: Anthropic brand palette. */
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@500;600&family=Lora:wght@400;500;600&display=block");
+
+:root {
+  --ivory: #faf9f5;
+  --panel: #f0eee6;
+  --ink: #141413;
+  --ink2: #3d3d3a;
+  --muted: #87857e;
+  --mid: #b0aea5;
+  --line: #e8e6dc;
+  --clay: #d97757;
+  --clay-soft: #f6e2d8;
+  --blue: #6a9bcc;
+  --green: #788c5d;
+  --heading: "Poppins", Arial, sans-serif;
+  --text: "Lora", Georgia, serif;
+}
+
+html, body { margin: 0; background: var(--ivory); }
+body { font-family: var(--text); color: var(--ink2); -webkit-font-smoothing: antialiased; }
+.fig { width: 1200px; box-sizing: border-box; padding: 44px 56px 36px; }
+h1 { font-family: var(--heading); font-weight: 600; font-size: 28px; line-height: 1.2; color: var(--ink); margin: 0 0 8px; letter-spacing: -0.01em; }
+.sub { font-size: 17px; line-height: 1.5; margin: 0 0 30px; max-width: 64em; }
+.foot { font-size: 13px; color: var(--muted); margin-top: 22px; line-height: 1.5; }
+.mono { font-family: "SFMono-Regular", Menlo, Consolas, monospace; }
+.legend { display: flex; gap: 28px; font-size: 14px; margin-top: 20px; }
+.legend span { display: inline-flex; align-items: center; gap: 9px; }
+.sw { width: 14px; height: 14px; border-radius: 4px; display: inline-block; }
+
+/* charts */
+svg text { font-family: var(--text); }
+.c-label { fill: var(--ink); font-size: 16px; }
+.c-label.strong { font-weight: 600; }
+.c-value { fill: var(--ink); font-size: 15px; font-variant-numeric: tabular-nums; }
+.c-note { fill: var(--muted); font-size: 13px; font-style: italic; }
+.c-axis { fill: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.c-grid { stroke: var(--line); stroke-width: 1.5; }

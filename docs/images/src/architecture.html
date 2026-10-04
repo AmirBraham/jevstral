@@ -1,0 +1,82 @@
+<!doctype html>
+<meta charset="utf-8">
+<link rel="stylesheet" href="style.css">
+<style>
+  .row { display: flex; align-items: stretch; gap: 0; }
+  .col { display: flex; flex-direction: column; }
+  .card { background: var(--panel); border-radius: 14px; padding: 18px 18px 16px; box-sizing: border-box; }
+  .card h2 { font-family: var(--heading); font-weight: 600; font-size: 15px; color: var(--ink); margin: 0 0 4px; }
+  .card .what { font-size: 13px; color: var(--muted); margin: 0 0 14px; line-height: 1.4; }
+  .arrow { width: 34px; display: flex; align-items: center; justify-content: center; color: var(--mid); }
+  .chip { font-family: "SFMono-Regular", Menlo, monospace; font-size: 12px; background: var(--ivory); border: 1.5px solid var(--line);
+          border-radius: 7px; padding: 5px 8px; margin-bottom: 6px; color: var(--ink2); white-space: nowrap; }
+  .chip.delim { border-color: var(--mid); }
+  .chip.read { border-color: var(--clay); background: var(--clay-soft); color: var(--ink); }
+  .doc { font-size: 14px; line-height: 1.5; background: var(--ivory); border-radius: 9px; padding: 10px 12px; color: var(--ink); margin-bottom: 10px; }
+  .q { font-size: 14px; color: var(--ink); margin: 2px 0 8px; font-weight: 600; }
+  .opt { font-size: 13px; font-family: "SFMono-Regular", Menlo, monospace; color: var(--ink2); margin-bottom: 4px; }
+  .layer { background: var(--ivory); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; }
+  .layer b { font-family: var(--heading); font-weight: 500; font-size: 14px; color: var(--ink); display: block; }
+  .layer small { font-size: 12.5px; color: var(--muted); }
+  .tag { display: inline-block; margin-top: 7px; font-size: 11.5px; font-family: "SFMono-Regular", Menlo, monospace; background: var(--clay); color: #fff; border-radius: 5px; padding: 3px 7px; }
+  .stack { position: relative; }
+  .stack::before, .stack::after { content: ""; position: absolute; inset: 0; border-radius: 14px; background: var(--line); z-index: -1; }
+  .stack::before { transform: translate(8px, 8px); }
+  .stack::after { transform: translate(4px, 4px); background: #e2dfd3; }
+  .formula { font-family: "SFMono-Regular", Menlo, monospace; font-size: 13px; color: var(--ink); background: var(--ivory); border-radius: 9px; padding: 10px 12px; line-height: 1.6; }
+  .bar { margin-bottom: 12px; font-size: 14px; color: var(--ink); }
+  .bar .head { display: flex; justify-content: space-between; margin-bottom: 5px; }
+  .bar .p { font-variant-numeric: tabular-nums; }
+  .bar .track { display: block; height: 12px; background: var(--ivory); border-radius: 4px; overflow: hidden; }
+  .bar .fill { display: block; height: 100%; background: var(--mid); border-radius: 0 4px 4px 0; min-width: 3px; }
+  .bar .fill.top { background: var(--clay); }
+</style>
+<div class="fig" style="height: 640px">
+  <h1>How Jevstral answers a question</h1>
+  <p class="sub">One forward pass from document to probabilities. The model reads the row once and never generates text.</p>
+  <div class="row">
+    <div class="card col" style="width: 210px">
+      <h2>Input</h2><p class="what">A document and a typed question</p>
+      <div class="doc">I was charged twice for order 1182. Please refund one of the charges.</div>
+      <div class="q">Which team?</div>
+      <div class="opt">· billing</div><div class="opt">· shipping</div><div class="opt">· returns</div>
+    </div>
+    <div class="arrow"><svg width="22" height="22" viewBox="0 0 22 22"><path d="M3 11h14M12 5l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    <div class="card col" style="width: 190px">
+      <h2>Token row</h2><p class="what">One row for each question</p>
+      <span class="chip">&lt;s&gt;</span>
+      <span class="chip delim">&lt;state&gt;</span>
+      <span class="chip">I was charged…</span>
+      <span class="chip delim">&lt;q&gt;</span>
+      <span class="chip">Which team?</span>
+      <span class="chip read">billing &lt;/opt&gt;</span>
+      <span class="chip read">shipping &lt;/opt&gt;</span>
+      <span class="chip read">returns &lt;/opt&gt;</span>
+      <span class="chip read">&lt;decide&gt;</span>
+    </div>
+    <div class="arrow"><svg width="22" height="22" viewBox="0 0 22 22"><path d="M3 11h14M12 5l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    <div class="card col stack" style="width: 250px">
+      <h2>Ministral 3 8B decoder</h2><p class="what">34 layers · base weights frozen</p>
+      <div class="layer"><b>Causal self-attention</b><small>Each token reads earlier tokens only</small><br><span class="tag">q k v o + LoRA</span></div>
+      <div class="layer"><b>MLP (SwiGLU)</b><small>4,096 → 14,336 → 4,096</small><br><span class="tag">gate up down + LoRA</span></div>
+      <div class="layer" style="margin-bottom:0"><b>State cache</b><small>The document is read once for all questions of a request</small></div>
+    </div>
+    <div class="arrow"><svg width="22" height="22" viewBox="0 0 22 22"><path d="M3 11h14M12 5l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    <div class="card col" style="width: 175px">
+      <h2>Pointer head</h2><p class="what">Reads the orange positions</p>
+      <div class="formula">score<sub>i</sub> =<br>q(h<sub>decide</sub>) · k(h<sub>opt i</sub>)<br>/ √256</div>
+      <p class="what" style="margin-top:12px">q, k: 4,096 → 256<br>The same k scores every option, so any number of options works.</p>
+    </div>
+    <div class="arrow"><svg width="22" height="22" viewBox="0 0 22 22"><path d="M3 11h14M12 5l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    <div class="card col" style="width: 200px">
+      <h2>Probabilities</h2><p class="what">softmax(score / T)<br>T = 2.04 after calibration</p>
+                        <div class="bar"><div class="head"><span>billing</span><span class="p">0.91</span></div><span class="track"><span class="fill top" style="width:91%"></span></span></div><div class="bar"><div class="head"><span>shipping</span><span class="p">0.05</span></div><span class="track"><span class="fill" style="width:5%"></span></span></div><div class="bar"><div class="head"><span>returns</span><span class="p">0.04</span></div><span class="track"><span class="fill" style="width:4%"></span></span></div>
+      <p class="what" style="margin-top:6px">The temperature T makes the probabilities match how often the model is correct.</p>
+    </div>
+  </div>
+  <div class="legend">
+    <span><i class="sw" style="background: var(--clay)"></i>Trained by Jevstral: LoRA (44.6M), pointer head (2.1M), 5 delimiter embeddings</span>
+    <span><i class="sw" style="background: var(--mid)"></i>Frozen: Ministral 3 8B Base</span>
+  </div>
+  <p class="foot">Example probabilities are an illustration. Delimiters are reserved Mistral tokens; user text cannot make them.</p>
+</div>

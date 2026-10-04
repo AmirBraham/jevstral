@@ -1,0 +1,56 @@
+<!doctype html>
+<meta charset="utf-8">
+<link rel="stylesheet" href="style.css">
+<style>
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px 22px; }
+  .step { background: var(--panel); border-radius: 14px; padding: 18px 18px 16px; position: relative; }
+  .step .n { font-family: var(--heading); font-weight: 600; font-size: 13px; color: var(--ivory); background: var(--mid);
+             width: 26px; height: 26px; border-radius: 13px; display: inline-flex; align-items: center; justify-content: center; }
+  .step.train .n { background: var(--clay); }
+  .step h2 { font-family: var(--heading); font-weight: 600; font-size: 16px; color: var(--ink); margin: 10px 0 4px; }
+  .step p { font-size: 13.5px; line-height: 1.45; margin: 0 0 10px; }
+  .facts { font-size: 12.5px; color: var(--muted); line-height: 1.6; }
+  .result { margin-top: 10px; font-size: 13.5px; color: var(--ink); background: var(--ivory); border-radius: 8px; padding: 7px 10px; }
+  .result b { color: var(--clay); font-weight: 600; }
+  .step:not(:nth-child(4n))::after { content: "→"; position: absolute; right: -18px; top: 22px; color: var(--mid); font-size: 18px; font-family: var(--heading); }
+</style>
+<div class="fig" style="height: 790px">
+  <h1>What we did</h1>
+  <p class="sub">Four supervised stages on one NVIDIA H100, then calibration and a fast inference path. Each stage starts from the checkpoint of the stage before it.</p>
+  <div class="grid">
+    <div class="step"><span class="n">1</span><h2>Data</h2>
+      <p>Public decision suites at pinned revisions.</p>
+      <div class="facts">11 files · 33,000 records<br>Each file checked against its SHA-256</div></div>
+    <div class="step train"><span class="n">2</span><h2>Stage 1 · Base</h2>
+      <p>Ten classification datasets, generated policy cases and rule structures.</p>
+      <div class="facts">12,576 records · 2 epochs · 70 min</div>
+      <div class="result">decision-v7: <b>0.881</b></div></div>
+    <div class="step train"><span class="n">3</span><h2>Stage 2 · Dates and missing evidence</h2>
+      <p>Date arithmetic, and a uniform answer when the document cannot decide.</p>
+      <div class="facts">1,425 records + 2,000 replayed · 10 min</div></div>
+    <div class="step train"><span class="n">4</span><h2>Stage 3 · Documents</h2>
+      <p>Real consumer complaints, up to 7,000 tokens.</p>
+      <div class="facts">5,219 records + 2,000 replayed · 45 min</div>
+      <div class="result">documents-v1: 0.851 → <b>0.899</b></div></div>
+    <div class="step train"><span class="n">5</span><h2>Stage 4 · Skills and tools</h2>
+      <p>Long policies, trade-offs, multi-hop, judging, code review, safety.</p>
+      <div class="facts">11,320 records + 4,000 replayed · 80 min</div>
+      <div class="result">hard-v1: 0.517 → <b>0.810</b></div></div>
+    <div class="step train"><span class="n">6</span><h2>Calibration</h2>
+      <p>One temperature on 648 questions from datasets that no stage trains on.</p>
+      <div class="facts">T = 2.04 · accuracy unchanged</div>
+      <div class="result">ECE: 0.141 → <b>0.043</b></div></div>
+    <div class="step"><span class="n">7</span><h2>Fast inference</h2>
+      <p>bf16 weights with LoRA merged. The document is read once for all its questions.</p>
+      <div class="facts">Mean probability change vs fp32: 0.003</div>
+      <div class="result">Median: <b>45.5 ms</b> per request</div></div>
+    <div class="step"><span class="n">8</span><h2>Benchmark</h2>
+      <p>Decision Index 0.2.1: 150,000 requests over 38 benchmarks, with the public harness.</p>
+      <div class="facts">One RTX PRO 6000 · same GPU as the leaderboard</div></div>
+  </div>
+  <div class="legend">
+    <span><i class="sw" style="background: var(--clay)"></i>Changes the model weights</span>
+    <span><i class="sw" style="background: var(--mid)"></i>Data, inference or measurement</span>
+  </div>
+  <p class="foot">Results are accuracy on development splits: items not used in training, from the same sources as the training data.</p>
+</div>
