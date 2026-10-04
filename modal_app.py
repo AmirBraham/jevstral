@@ -3,7 +3,7 @@
 modal run modal_app.py::prepare_data
 modal run modal_app.py::inspect_data
 modal run modal_app.py::train --stage 1 --smoke
-modal run --detach modal_app.py::train --stage 1
+modal run --detach modal_app.py::train --stage 1   (returns at once; the job runs on Modal)
 modal run --detach modal_app.py::calibrate
 modal run modal_app.py::check_hub
 modal run modal_app.py::publish --stage 1
@@ -140,12 +140,19 @@ def local_git_commit() -> str:
 
 @app.local_entrypoint()
 def train(stage: int, smoke: bool = False) -> None:
-    train_stage.remote(stage, smoke, local_git_commit())
+    # spawn(), not remote(): the job must not depend on the local process. With remote(), a lost local
+    # network connection cancels the job (this stopped stage 4 at step 680 on 2026-10-04).
+    if smoke:
+        train_stage.remote(stage, smoke, local_git_commit())
+    else:
+        call = train_stage.spawn(stage, smoke, local_git_commit())
+        print(f"started {call.object_id}. Follow it in the Modal dashboard or W&B.")
 
 
 @app.local_entrypoint()
 def calibrate() -> None:
-    calibrate_stage4.remote()
+    call = calibrate_stage4.spawn()
+    print(f"started {call.object_id}. Follow it in the Modal dashboard.")
 
 
 @app.local_entrypoint()

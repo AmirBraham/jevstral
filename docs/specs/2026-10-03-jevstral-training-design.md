@@ -360,7 +360,7 @@ Each checkpoint folder has these files:
 | The checkpoint has a different base model revision | Stop. Give the two revisions. |
 | Modal stops the job | Resume from the last intermediate checkpoint. |
 
-The training saves an intermediate checkpoint every 30 minutes. `train_stage` resumes from the last intermediate checkpoint of that stage if one exists.
+The training saves an intermediate checkpoint every 15 minutes. `train_stage` resumes from the last intermediate checkpoint of that stage if one exists.
 
 ### 11.3 Log
 

@@ -35,4 +35,4 @@ Before each stage, a smoke run trains 20 steps on 64 records. It finds load and 
 
 ## Resume
 
-The training saves a resume checkpoint every 30 minutes. If Modal stops the job, Modal starts it again, and the training continues from that checkpoint with the same data order.
+The training saves a resume checkpoint every 15 minutes. If Modal stops the job, Modal starts it again, and the training continues from that checkpoint with the same data order.
