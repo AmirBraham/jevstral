@@ -24,18 +24,9 @@ Code: [github.com/AmirBraham/jevstral](https://github.com/AmirBraham/jevstral).
 
 ## Status
 
-Work in progress. This repository holds one folder for each finished training stage.
+Training and calibration are done. **Use the `stage4/` folder**: it is the final, calibrated model (T = 2.04). The folders `stage1/` to `stage3/` are intermediate checkpoints, kept for reproducibility. They are not calibrated.
 
-| Folder | Stage | Status |
-|---|---|---|
-| `stage1/` | Base: `decision-v7` | Done |
-| `stage2/` | Dates and missing evidence: `night2` | Done |
-| `stage3/` | Documents: `documents-v1` (CFPB complaints) | Done |
-| `stage4/` | Skills and developer tools: `hard-v1`, `devtools-v1` | Done. **Use this checkpoint.** |
-| `stage4/` | Calibration (one temperature, T = 2.04, in `head.pt`) | Done |
-| – | Decision Index 0.2.1 benchmark, accuracy and latency | Not started |
-
-Only `stage4/` is calibrated (T = 2.04). The checkpoints of stages 1 to 3 have T = 1.0. Do not use their probabilities as calibrated values.
+The [Decision Index](https://huggingface.co/spaces/multimodalart/jev-decision-index) benchmark against Jev, Kev and Laya is in progress.
 
 ## Model details
 
@@ -83,37 +74,47 @@ Common settings: cross-entropy loss over the options of each question (soft targ
 
 Hardware: one NVIDIA H100 80 GB on Modal. Stage 1 took approximately 70 minutes, stage 2 approximately 10 minutes, stage 3 approximately 45 minutes, stage 4 approximately 80 minutes.
 
-## Results so far
+## Results
 
-Development splits. The model did not train on these items, but they come from the same sources as the training data. These are not benchmark results.
+### Accuracy on development splits
 
-| Development set | Questions | Stage 1 | Stage 2 | Stage 3 | **Stage 4 (final)** | Kev-4B, final |
-|---|---|---|---|---|---|---|
-| `decision-v7` | 1,468 | 0.881 | 0.884 | 0.883 | **0.881** | 0.873 |
-| `documents-v1` | 920 | – | 0.851 | 0.899 | **0.891** | 0.891 |
-| `hard-v1` | 1,083 | – | 0.517 | – | **0.810** | 0.786 |
-| `devtools-v1` | 1,074 | – | 0.563 | – | **0.710** | 0.739 |
+The model did not train on these items, but they come from the same sources as the training data. These are not benchmark results.
 
-Values are accuracy. "–" means not measured at that stage. Kev-4B values are from its model card. Stage 4 values are before calibration; calibration does not change accuracy.
+| Development set | Questions | Jevstral 8B | Kev-4B |
+|---|---|---|---|
+| `decision-v7`: classification and policy decisions | 1,468 | **0.881** | 0.873 |
+| `documents-v1`: long consumer complaints | 920 | **0.891** | 0.891 |
+| `hard-v1`: long policies, trade-offs, multi-hop, judging | 1,083 | **0.810** | 0.786 |
+| `devtools-v1`: code review, commits, flaky tests, safety | 1,074 | 0.710 | **0.739** |
 
-`hard-v1` by family after stage 4: ambiguous 0.880, judge 0.904, long policy 0.830, multi-hop 0.895, probability 0.735, temporal and numeric 0.621, trade-off 0.780.
-
-`devtools-v1` by source after stage 4: Aegis 0.806, CodeReviewer 0.727, CommitPackFT 0.759, FlakeFlagger 0.680, and two sources that no stage trains on: prompt injection 0.687, When2Call 0.540.
+Kev-4B values are from its model card.
 
 ### Calibration
 
-One temperature, fitted on 648 questions from datasets that no stage trains on (`transfer-r3` calibration split, 8 sources, and 200 MMLU-Pro questions from `transfer-v9` development):
+One temperature, T = 2.04, fitted on 648 questions from datasets that no training stage uses (`transfer-r3` calibration split, 8 sources, and 200 MMLU-Pro questions from `transfer-v9` development):
 
-| | Before (T = 1) | After (T = 2.04) |
+| | Before | After |
 |---|---|---|
+| Expected calibration error | 0.141 | **0.043** |
+| Log loss | 1.018 | **0.848** |
+| Brier score | 0.454 | **0.418** |
 | Accuracy | 0.679 | 0.679 |
-| Expected calibration error | 0.141 | 0.043 |
-| Log loss | 1.018 | 0.848 |
-| Brier score | 0.454 | 0.418 |
 
-## Planned benchmark
+### Latency
 
-The [Decision Index 0.2.1](https://huggingface.co/spaces/multimodalart/jev-decision-index) (38 benchmarks in five areas) already scores Jev (57.9), Kev 4B (34.6) and Laya (6.0). Jevstral will run the same suite with the public harness, and the results will report accuracy and latency.
+One request at a time, bf16 weights with LoRA merged into the base weights:
+
+| GPU | Requests | Median | p95 |
+|---|---|---|---|
+| RTX PRO 6000 | 100 Decision Index requests | **45.5 ms** | 1,098 ms |
+| H100 | 100 short development requests (121 tokens) | 27 ms | 33 ms |
+| H100 | 100 long documents (819 tokens) | 37 ms | 190 ms |
+
+The results of each training stage are in the [training log](https://github.com/AmirBraham/jevstral/blob/main/docs/training-log.md).
+
+## Benchmark
+
+In progress: the [Decision Index 0.2.1](https://huggingface.co/spaces/multimodalart/jev-decision-index) (38 benchmarks in five areas), which already scores Jev (57.9), Kev 4B (34.6) and Laya (6.0). Jevstral runs the same suite with the public harness.
 
 ## Intended use
 

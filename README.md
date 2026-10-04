@@ -10,19 +10,50 @@ Example: for a support ticket, the question "Which team?" with the options `bill
 
 ## Status
 
-Training is done: four stages and calibration. The benchmark is next.
+Training and calibration are done. The [Decision Index](https://huggingface.co/spaces/multimodalart/jev-decision-index) benchmark against Jev, Kev and Laya is in progress.
 
-| Step | Status |
-|---|---|
-| Code for all stages and calibration | Done |
-| Data download and verification | Done |
-| Stage 1: base | Done. `decision-v7` development: accuracy 0.881, Brier 0.193, ECE 0.065 (before calibration) |
-| Stage 2: dates and missing evidence | Done. `decision-v7` development: accuracy 0.884, Brier 0.191, ECE 0.070 (before calibration). Its own skills have no development split; the benchmarks will measure them. |
-| Stage 3: documents | Done. `documents-v1` development: accuracy 0.899 (0.851 before), ECE 0.065. `decision-v7` development: 0.883. |
-| Stage 4: skills and developer tools | Done. `hard-v1` development: 0.810 (0.517 before), `devtools-v1`: 0.710 (0.563 before), `documents-v1`: 0.891, `decision-v7`: 0.881. |
-| Calibration | Done. T = 2.04. On 648 held-out questions: ECE 0.141 → 0.043, log loss 1.018 → 0.848, accuracy 0.679 (unchanged). |
-| Fast inference path (bf16 weights, LoRA merged into W) | Done. One H100, one request at a time: median 27 ms for short requests (121 tokens), 37 ms for long documents (819 tokens). The fp32 training path takes 114 ms and 124 ms. Against fp32 on 567 development questions: mean probability difference 0.003, maximum 0.034, 3 changed answers. |
-| Decision Index 0.2.1 benchmark: Jevstral against Jev, Kev and Laya, with accuracy **and** latency | Not started |
+## Results
+
+Final model: the calibrated `stage4/` checkpoint.
+
+### Accuracy on development splits
+
+The model did not train on these items, but they come from the same sources as the training data. These are not benchmark results.
+
+| Development set | Questions | Jevstral 8B | Kev-4B |
+|---|---|---|---|
+| `decision-v7`: classification and policy decisions | 1,468 | **0.881** | 0.873 |
+| `documents-v1`: long consumer complaints | 920 | **0.891** | 0.891 |
+| `hard-v1`: long policies, trade-offs, multi-hop, judging | 1,083 | **0.810** | 0.786 |
+| `devtools-v1`: code review, commits, flaky tests, safety | 1,074 | 0.710 | **0.739** |
+
+Kev-4B values are from its model card.
+
+### Calibration
+
+One temperature, T = 2.04, fitted on 648 questions from datasets that no training stage uses:
+
+| | Before | After |
+|---|---|---|
+| Expected calibration error | 0.141 | **0.043** |
+| Log loss | 1.018 | **0.848** |
+| Accuracy | 0.679 | 0.679 |
+
+Calibration changes the confidence, not the answers.
+
+### Latency
+
+One request at a time, bf16 weights with LoRA merged into the base weights:
+
+| GPU | Requests | Median | p95 |
+|---|---|---|---|
+| RTX PRO 6000 (the Decision Index GPU) | 100 Decision Index requests | **45.5 ms** | 1,098 ms |
+| H100 | 100 short development requests (121 tokens) | 27 ms | 33 ms |
+| H100 | 100 long documents (819 tokens) | 37 ms | 190 ms |
+
+Slow requests have many questions on one long document. Against the fp32 training path on 567 development questions, the bf16 path has a mean probability difference of 0.003 and changes 3 answers.
+
+The results of each training stage are in [docs/training-log.md](docs/training-log.md).
 
 ## How it works
 
@@ -43,6 +74,7 @@ More detail:
 
 - `docs/specs/`: the design.
 - `docs/concepts/`: how each part works (decision model, encoding, augmentation, pointer head, LoRA, training stages, calibration).
+- `docs/training-log.md`: the results of each training stage.
 
 ## Setup
 
