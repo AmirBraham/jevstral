@@ -19,7 +19,8 @@ Work in progress. Stages 1, 2 and 3 of 4 are done.
 | Stage 3: documents | Done. `documents-v1` development: accuracy 0.899 (0.851 before), ECE 0.065. `decision-v7` development: 0.883. |
 | Stage 4 | Not started |
 | Calibration | Not started |
-| Benchmarks against Kev | Not started |
+| Fast inference path (bf16 weights, LoRA merged into W, measured latency) | Not started. Required before the benchmark. |
+| Decision Index 0.2.1 benchmark: Jevstral against Jev, Kev and Laya, with accuracy **and** latency | Not started |
 
 ## How it works
 
