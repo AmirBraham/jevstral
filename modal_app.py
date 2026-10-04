@@ -44,6 +44,8 @@ VOLUMES = {"/cache": hf_cache, str(DATA_DIR): data, str(RUNS_DIR): runs}
 BENCH_DIR = Path("/bench")
 SUITE_DIR = BENCH_DIR / "suite-0.2"
 FINAL = RUNS_DIR / "main" / "stage4" / "final"
+# The Decision Index maintainers measure latency on one RTX PRO 6000. The same GPU makes our latency comparable.
+BENCH_GPU = "RTX-PRO-6000"
 SECRETS = [modal.Secret.from_name("huggingface")]
 WANDB = modal.Secret.from_name("wandb")
 HOUR = 3600
@@ -193,7 +195,12 @@ def build_suite() -> None:
 
 
 @app.function(
-    image=image, gpu="H100", volumes={**VOLUMES, str(BENCH_DIR): bench}, secrets=SECRETS, memory=65536, timeout=2 * HOUR
+    image=image,
+    gpu=BENCH_GPU,
+    volumes={**VOLUMES, str(BENCH_DIR): bench},
+    secrets=SECRETS,
+    memory=65536,
+    timeout=2 * HOUR,
 )
 def bench_sample(n: int = 100, path: str = "bf16-merged") -> None:
     """Run Jevstral on a sample of n requests of the suite and score it. Use the output to estimate the full run."""
@@ -232,7 +239,7 @@ def bench_sample(n: int = 100, path: str = "bf16-merged") -> None:
 
 @app.function(
     image=image,
-    gpu="H100",
+    gpu=BENCH_GPU,
     volumes={**VOLUMES, str(BENCH_DIR): bench},
     secrets=SECRETS,
     memory=65536,
