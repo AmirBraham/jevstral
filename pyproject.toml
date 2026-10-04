@@ -8,6 +8,8 @@ dependencies = ["modal>=1.6,<2"]
 [dependency-groups]
 # Installed only in the Modal image (modal_app.py), not on the local computer.
 train = ["torch==2.14.1", "transformers==5.18.0", "peft==0.21.2", "wandb>=0.22"]
+# The Decision Index harness, pinned to one commit. Installed only in the Modal image.
+bench = ["decision-index[rebuild] @ git+https://github.com/apolinario/decision-index@87d4650b42b377c0291a89c1f1a879f9b31082bf"]
 dev = ["ruff>=0.14"]
 
 [build-system]

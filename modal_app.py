@@ -12,8 +12,12 @@ modal run modal_app.py::publish_model_card
 modal run modal_app.py::track_finished_stage --stage 1
 modal run modal_app.py::evaluate_stage --stage 2
 modal run modal_app.py::check_inference
+python modal_app.py build_suite      (CPU, hours; needs access to cais/hle)
+modal run modal_app.py::bench_sample --n 100
+python modal_app.py bench_full       (only after the sample, with an approved cost)
 """
 
+import os
 import subprocess
 from pathlib import Path
 
@@ -23,7 +27,7 @@ app = modal.App("jevstral")
 
 image = (
     modal.Image.debian_slim(python_version="3.12")
-    .uv_sync(groups=["train"])
+    .uv_sync(groups=["train", "bench"])
     .env({"HF_HOME": "/cache/hf", "TOKENIZERS_PARALLELISM": "false"})
     .add_local_python_source("jevstral")
 )
@@ -31,10 +35,14 @@ image = (
 hf_cache = modal.Volume.from_name("jevstral-hf-cache", create_if_missing=True)
 data = modal.Volume.from_name("jevstral-data", create_if_missing=True)
 runs = modal.Volume.from_name("jevstral-runs", create_if_missing=True)
+bench = modal.Volume.from_name("jevstral-bench", create_if_missing=True)
 
 DATA_DIR = Path("/data")
 RUNS_DIR = Path("/runs")
 VOLUMES = {"/cache": hf_cache, str(DATA_DIR): data, str(RUNS_DIR): runs}
+BENCH_DIR = Path("/bench")
+SUITE_DIR = BENCH_DIR / "suite-0.2"
+FINAL = RUNS_DIR / "main" / "stage4" / "final"
 SECRETS = [modal.Secret.from_name("huggingface")]
 WANDB = modal.Secret.from_name("wandb")
 HOUR = 3600
@@ -146,6 +154,121 @@ def track_finished_stage(stage: int) -> None:
     print("run:", upload_finished_stage(RUNS_DIR / "main" / f"stage{stage}"))
 
 
+def harness(*args: str) -> None:
+    """Run one command of the Decision Index harness and stop on failure."""
+    import sys
+
+    command = [sys.executable, "-m", "decision_index", *args]
+    print("$", " ".join(command), flush=True)
+    # /root holds the jevstral package in the container; the harness imports jevstral.engine from there.
+    env = {
+        **os.environ,
+        "HF_HUB_DISABLE_XET": "1",
+        "PYTHONPATH": os.pathsep.join(filter(None, ["/root", os.environ.get("PYTHONPATH")])),
+    }
+    subprocess.run(command, check=True, cwd=BENCH_DIR, env=env)
+
+
+@app.function(image=image, volumes={str(BENCH_DIR): bench}, secrets=SECRETS, memory=32768, timeout=8 * HOUR)
+def build_suite() -> None:
+    """Rebuild the Decision Index 0.2 suite from its public sources and verify it (CPU, about 7 GB of downloads).
+
+    The Hugging Face token must have access to the gated dataset cais/hle.
+    """
+    built = "work/artifacts/benchmark-suite/release-v2-rebuilt"
+    harness("suite", "rebuild", "--work", "work")
+    bench.commit()
+    harness(
+        "suite",
+        "import",
+        "--dir",
+        str(SUITE_DIR),
+        "--rows",
+        f"{built}/selected-rows.jsonl.gz",
+        "--added-rows",
+        f"{built}/added-rows.jsonl.gz",
+    )
+    bench.commit()
+
+
+@app.function(
+    image=image, gpu="H100", volumes={**VOLUMES, str(BENCH_DIR): bench}, secrets=SECRETS, memory=65536, timeout=2 * HOUR
+)
+def bench_sample(n: int = 100, path: str = "bf16-merged") -> None:
+    """Run Jevstral on a sample of n requests of the suite and score it. Use the output to estimate the full run."""
+    sample = f"sample-{n}.jsonl.gz"
+    out = f"runs/sample-{n}-{path}"
+    harness("suite", "sample", "--dir", str(SUITE_DIR), "--n", str(n), "--out", sample)
+    harness(
+        "run",
+        "--engine",
+        "jevstral.engine:JevstralEngine",
+        "--option",
+        f"checkpoint={FINAL}",
+        "--option",
+        f"path={path}",
+        "--suite-dir",
+        str(SUITE_DIR),
+        "--rows",
+        sample,
+        "--out",
+        out,
+        "--fresh",
+    )
+    harness(
+        "score",
+        "--results",
+        f"{out}/results.jsonl",
+        "--suite-dir",
+        str(SUITE_DIR),
+        "--engine",
+        "jevstral",
+        "--out",
+        out,
+    )
+    bench.commit()
+
+
+@app.function(
+    image=image,
+    gpu="H100",
+    volumes={**VOLUMES, str(BENCH_DIR): bench},
+    secrets=SECRETS,
+    memory=65536,
+    timeout=24 * HOUR,
+)
+def bench_full(path: str = "bf16-merged") -> None:
+    """Run and score the full suite. Resumes from an existing results.jsonl. Start it with start_job (deployed app)."""
+    import threading
+
+    out = f"runs/full-{path}"
+
+    def commit_often(stop: threading.Event) -> None:
+        while not stop.wait(600):
+            bench.commit()
+
+    stop = threading.Event()
+    threading.Thread(target=commit_often, args=(stop,), daemon=True).start()
+    try:
+        harness(
+            "pipeline",
+            "--engine",
+            "jevstral.engine:JevstralEngine",
+            "--option",
+            f"checkpoint={FINAL}",
+            "--option",
+            f"path={path}",
+            "--suite-dir",
+            str(SUITE_DIR),
+            "--out",
+            out,
+            "--compact",
+        )
+    finally:
+        stop.set()
+        bench.commit()
+
+
 def local_git_commit() -> str:
     commit = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()
     dirty = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True, check=True).stdout.strip()
@@ -181,8 +304,12 @@ def start_job(argv: list[str]) -> None:
         call = modal.Function.from_name("jevstral", "train_stage").spawn(int(argv[1]), False, local_git_commit())
     elif argv == ["calibrate"]:
         call = modal.Function.from_name("jevstral", "calibrate_stage4").spawn()
+    elif argv == ["build_suite"]:
+        call = modal.Function.from_name("jevstral", "build_suite").spawn()
+    elif argv == ["bench_full"]:
+        call = modal.Function.from_name("jevstral", "bench_full").spawn()
     else:
-        raise SystemExit("usage: python modal_app.py train <stage> | calibrate")
+        raise SystemExit("usage: python modal_app.py train <stage> | calibrate | build_suite | bench_full")
     print(f"started {call.object_id}. Follow it at https://modal.com/apps (app jevstral, deployed).")
 
 
