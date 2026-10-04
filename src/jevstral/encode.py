@@ -54,8 +54,12 @@ class Encoder:
         # split_special_tokens=True: if a user writes "<SPECIAL_20>", it stays plain text.
         return self.tokenizer(text, add_special_tokens=False, split_special_tokens=True)["input_ids"]
 
+    def state_ids(self, record: Record) -> list[int]:
+        """The tokens that start every row of the record: <s> <state> state text."""
+        return [self.bos, self.ids["state"], *self.text(record.state)]
+
     def rows(self, record: Record, limits: Limits) -> list[Row]:
-        state = [self.bos, self.ids["state"], *self.text(record.state)]
+        state = self.state_ids(record)
         if len(state) > limits.max_state:
             raise RecordTooLong(f"{record.rid}: state has {len(state)} tokens, limit {limits.max_state}")
         rows = []

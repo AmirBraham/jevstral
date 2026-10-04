@@ -5,7 +5,7 @@ import math
 import torch
 from peft import LoraConfig, PeftModel, get_peft_model
 from torch import nn
-from transformers import AutoTokenizer, Mistral3ForConditionalGeneration
+from transformers import AutoTokenizer, DynamicCache, Mistral3ForConditionalGeneration
 
 from .encode import Row
 
@@ -132,18 +132,68 @@ class DecisionModel(nn.Module):
     def predict_scores(self, rows: list[Row]) -> list[torch.Tensor]:
         """Option scores (divided by T) for each row, in the input order. Rows go in batches of similar length."""
         self.eval()
-        order = sorted(range(len(rows)), key=lambda i: len(rows[i].ids))
         scores: list[torch.Tensor] = [torch.empty(0)] * len(rows)
-        start = 0
-        while start < len(order):
-            end = start + 1
-            while end < len(order) and (end - start + 1) * len(rows[order[end]].ids) <= ROW_TOKENS_PER_PASS:
-                end += 1
-            batch = order[start:end]
+        for batch in _passes(rows):
             for i, score in zip(batch, self.scores([rows[i] for i in batch]), strict=True):
                 scores[i] = score.cpu()
-            start = end
         return scores
+
+    @torch.no_grad()
+    def predict_scores_cached(self, prefix: list[int], rows: list[Row]) -> list[torch.Tensor]:
+        """predict_scores() for rows that all start with `prefix` (the state). The state is computed once; each row
+        then runs only its question part on top of the cached keys and values of the state."""
+        self.eval()
+        size = len(prefix)
+        if any(row.ids[:size] != prefix for row in rows):
+            raise ValueError("every row must start with the prefix")
+        autocast = torch.autocast("cuda", dtype=torch.bfloat16, enabled=self.device.type == "cuda")
+        with autocast:
+            state = self.decoder(input_ids=torch.tensor([prefix], device=self.device), use_cache=True)
+        cached = [(layer.keys, layer.values) for layer in state.past_key_values.layers]
+        scores: list[torch.Tensor] = [torch.empty(0)] * len(rows)
+        for batch in _passes([Row(r.ids[size:], 0, [], ()) for r in rows], prefix_len=size):
+            n = len(batch)
+            length = max(len(rows[i].ids) - size for i in batch)
+            ids = torch.full((n, length), self.pad_id, dtype=torch.long)
+            mask = torch.zeros((n, size + length), dtype=torch.long)
+            mask[:, :size] = 1
+            for j, i in enumerate(batch):
+                question = rows[i].ids[size:]
+                ids[j, : len(question)] = torch.tensor(question)
+                mask[j, size : size + len(question)] = 1
+            cache = DynamicCache(
+                ddp_cache_data=[(k.expand(n, -1, -1, -1), v.expand(n, -1, -1, -1)) for k, v in cached],
+                config=self.decoder.config,
+            )
+            positions = (size + torch.arange(length, device=self.device)).expand(n, length)
+            with autocast:
+                hidden = self.decoder(
+                    input_ids=ids.to(self.device),
+                    attention_mask=mask.to(self.device),
+                    position_ids=positions,
+                    past_key_values=cache,
+                    use_cache=True,
+                ).last_hidden_state.float()
+            for j, i in enumerate(batch):
+                row = rows[i]
+                options = [index - size for index in row.option_indices]
+                score = self.head(hidden[j, row.decide_index - size], hidden[j, options]) / self.temperature
+                scores[i] = score.cpu()
+        return scores
+
+
+def _passes(rows: list[Row], prefix_len: int = 0) -> list[list[int]]:
+    """Row indices in batches of similar length. A batch holds at most ROW_TOKENS_PER_PASS tokens, counting the
+    state once for each row (a cached state is copied into each row of the batch)."""
+    order = sorted(range(len(rows)), key=lambda i: len(rows[i].ids))
+    batches, start = [], 0
+    while start < len(order):
+        end = start + 1
+        while end < len(order) and (end - start + 1) * (prefix_len + len(rows[order[end]].ids)) <= ROW_TOKENS_PER_PASS:
+            end += 1
+        batches.append(order[start:end])
+        start = end
+    return batches
 
 
 def delimiter_report(delimiter_ids: list[int]) -> str:
