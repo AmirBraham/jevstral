@@ -36,7 +36,10 @@ def start(name: str, config: dict, run_id: str | None = None) -> Tracker:
 def flatten(metrics: dict) -> dict:
     """{"v7/decision-v7/development.jsonl": {"accuracy": 0.9}} -> {"dev/decision-v7/accuracy": 0.9}"""
     return {
-        f"dev/{path.split('/')[-2]}/{key}": value for path, values in metrics.items() for key, value in values.items()
+        f"dev/{path.split('/')[-2]}/{key}": value
+        for path, values in metrics.items()
+        for key, value in values.items()
+        if key != "by_source"
     }
 
 

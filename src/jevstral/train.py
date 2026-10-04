@@ -93,22 +93,41 @@ def cross_entropy(scores: list[torch.Tensor], rows: list[Row]) -> torch.Tensor:
 def evaluate(
     model: DecisionModel, encoder: Encoder, paths: tuple[str, ...], data_dir: Path, limit: int | None = None
 ) -> dict:
+    """Metrics for each file, and for each source in the file (the `_meta.source` of the records)."""
     results = {}
     for path in paths:
-        rows, skipped = [], 0
+        rows, sources, skipped = [], [], 0
         for raw in suites.load(path, data_dir)[:limit]:
             try:
-                rows += encoder.rows(to_record(raw), LONG)
+                record_rows = encoder.rows(to_record(raw), LONG)
             except RecordTooLong:
                 skipped += 1
+                continue
+            rows += record_rows
+            sources += [raw.get("_meta", {}).get("source", "unknown")] * len(record_rows)
         scores = model.predict_scores(rows)
-        predictions = [
-            (score.softmax(-1).tolist(), row.target.index(1.0))
-            for score, row in zip(scores, rows, strict=True)
-            if 1.0 in row.target
-        ]
-        results[path] = {**summarize(predictions), "skipped_records": skipped}
+        predictions: dict[str, list] = {}
+        for score, row, source in zip(scores, rows, sources, strict=True):
+            if 1.0 in row.target:
+                predictions.setdefault(source, []).append((score.softmax(-1).tolist(), row.target.index(1.0)))
+        everything = [p for group in predictions.values() for p in group]
+        results[path] = {
+            **summarize(everything),
+            "skipped_records": skipped,
+            "by_source": {source: summarize(group) for source, group in sorted(predictions.items())},
+        }
     return results
+
+
+def evaluate_checkpoint(stage_number: int, paths: tuple[str, ...], data_dir: Path, runs_dir: Path) -> dict:
+    """Measure the final checkpoint of a stage on development files, without training. Write eval.json next to it."""
+    final = runs_dir / "main" / f"stage{stage_number}" / "final"
+    encoder = Encoder(load_tokenizer())
+    model = checkpoint.load(final, load_text_decoder(), encoder.delimiter_ids, encoder.pad)
+    model.to("cuda" if torch.cuda.is_available() else "cpu")
+    metrics = evaluate(model, encoder, paths, data_dir)
+    (final.parent / "eval.json").write_text(json.dumps(metrics, indent=2))
+    return metrics
 
 
 def run_stage(

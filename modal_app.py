@@ -8,6 +8,7 @@ modal run --detach modal_app.py::calibrate
 modal run modal_app.py::check_hub
 modal run modal_app.py::publish --stage 1
 modal run modal_app.py::track_finished_stage --stage 1
+modal run modal_app.py::evaluate_stage --stage 2
 """
 
 import subprocess
@@ -77,6 +78,19 @@ def train_stage(stage: int, smoke: bool, git_commit: str) -> None:
     from jevstral.train import run_stage
 
     run_stage(STAGES[stage], DATA_DIR, RUNS_DIR, git_commit, smoke=smoke, persist=persist)
+
+
+@app.function(image=image, gpu="H100", volumes=VOLUMES, secrets=SECRETS, memory=65536, timeout=2 * HOUR)
+def evaluate_stage(stage: int) -> None:
+    """Measure a finished stage on all four development files, without training."""
+    import json
+
+    from jevstral.stages import STAGES
+    from jevstral.train import evaluate_checkpoint
+
+    metrics = evaluate_checkpoint(stage, STAGES[4].dev_files, DATA_DIR, RUNS_DIR)
+    runs.commit()
+    print(json.dumps(metrics, indent=2))
 
 
 @app.function(image=image, gpu="H100", volumes=VOLUMES, secrets=SECRETS, memory=65536, timeout=2 * HOUR)
