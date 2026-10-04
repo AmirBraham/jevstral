@@ -25,11 +25,20 @@ from pathlib import Path
 import modal
 
 app = modal.App("jevstral")
+HARNESS_COMMIT = "87d4650b42b377c0291a89c1f1a879f9b31082bf"  # the same commit as the bench group in pyproject.toml
 
 image = (
     modal.Image.debian_slim(python_version="3.12")
     .apt_install("git")  # uv fetches the pinned Decision Index harness from GitHub
     .uv_sync(groups=["train", "bench"])
+    # The harness reads its hub/ files (manifest, exclusions) from <site-packages>/hub, a path that only exists in a
+    # git checkout. Copy them from the same pinned commit.
+    .run_commands(
+        f"git clone --quiet https://github.com/apolinario/decision-index.git /tmp/decision-index"
+        f" && git -C /tmp/decision-index checkout --quiet {HARNESS_COMMIT}"
+        " && cp -r /tmp/decision-index/hub /.uv/.venv/lib/python3.12/site-packages/hub"
+        " && rm -rf /tmp/decision-index"
+    )
     .env({"HF_HOME": "/cache/hf", "TOKENIZERS_PARALLELISM": "false"})
     .add_local_python_source("jevstral")
 )
@@ -200,14 +209,15 @@ def harness(*args: str) -> None:
     timeout=8 * HOUR,
     nonpreemptible=True,  # a preemption on 2026-10-04 lost 30 minutes of downloads
 )
-def build_suite() -> None:
+def build_suite(reuse_work: bool = False) -> None:
     """Rebuild the Decision Index 0.2 suite from its public sources and verify it (CPU, about 7 GB of downloads).
 
     The Hugging Face token must have access to the gated dataset cais/hle.
     """
     built = "work/artifacts/benchmark-suite/release-v2-rebuilt"
+    reuse = ["--skip-download", "--skip-normalize"] if reuse_work else []
     with committing(bench, every_seconds=300):
-        harness("suite", "rebuild", "--work", "work")
+        harness("suite", "rebuild", "--work", "work", *reuse)
     harness(
         "suite",
         "import",
@@ -327,12 +337,12 @@ def start_job(argv: list[str]) -> None:
         call = modal.Function.from_name("jevstral", "train_stage").spawn(int(argv[1]), False, local_git_commit())
     elif argv == ["calibrate"]:
         call = modal.Function.from_name("jevstral", "calibrate_stage4").spawn()
-    elif argv == ["build_suite"]:
-        call = modal.Function.from_name("jevstral", "build_suite").spawn()
+    elif argv[:1] == ["build_suite"]:
+        call = modal.Function.from_name("jevstral", "build_suite").spawn(reuse_work="--reuse" in argv)
     elif argv == ["bench_full"]:
         call = modal.Function.from_name("jevstral", "bench_full").spawn()
     else:
-        raise SystemExit("usage: python modal_app.py train <stage> | calibrate | build_suite | bench_full")
+        raise SystemExit("usage: python modal_app.py train <stage> | calibrate | build_suite [--reuse] | bench_full")
     print(f"started {call.object_id}. Follow it at https://modal.com/apps (app jevstral, deployed).")
 
 
