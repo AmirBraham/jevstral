@@ -59,13 +59,16 @@ uv run modal secret create wandb WANDB_API_KEY=<your key>
 uv run modal run modal_app.py::prepare_data
 uv run modal run modal_app.py::inspect_data
 uv run modal run modal_app.py::train --stage 1 --smoke
-uv run modal run --detach modal_app.py::train --stage 1
+uv run modal deploy modal_app.py
+uv run python modal_app.py train 1
 ```
+
+`modal deploy` puts the app on Modal. `python modal_app.py train N` starts the stage on the deployed app and returns at once. The job does not depend on the local computer or its network. Deploy again after each code change.
 
 Do stages 2, 3 and 4 in the same way. Then fit the temperature:
 
 ```
-uv run modal run --detach modal_app.py::calibrate
+uv run python modal_app.py calibrate
 ```
 
 ## Back up to Hugging Face

@@ -3,8 +3,9 @@
 modal run modal_app.py::prepare_data
 modal run modal_app.py::inspect_data
 modal run modal_app.py::train --stage 1 --smoke
-modal run --detach modal_app.py::train --stage 1   (returns at once; the job runs on Modal)
-modal run --detach modal_app.py::calibrate
+modal deploy modal_app.py          (after each code change)
+python modal_app.py train 1        (full stage; returns at once, the job runs on Modal)
+python modal_app.py calibrate
 modal run modal_app.py::check_hub
 modal run modal_app.py::publish --stage 1
 modal run modal_app.py::publish_model_card
@@ -140,19 +141,11 @@ def local_git_commit() -> str:
 
 @app.local_entrypoint()
 def train(stage: int, smoke: bool = False) -> None:
-    # spawn(), not remote(): the job must not depend on the local process. With remote(), a lost local
-    # network connection cancels the job (this stopped stage 4 at step 680 on 2026-10-04).
-    if smoke:
-        train_stage.remote(stage, smoke, local_git_commit())
-    else:
-        call = train_stage.spawn(stage, smoke, local_git_commit())
-        print(f"started {call.object_id}. Follow it in the Modal dashboard or W&B.")
-
-
-@app.local_entrypoint()
-def calibrate() -> None:
-    call = calibrate_stage4.spawn()
-    print(f"started {call.object_id}. Follow it in the Modal dashboard.")
+    """Smoke runs only. Full stages start from the deployed app (see start_job below): an ephemeral app depends on
+    the local network, and a lost connection cancelled stage 4 on 2026-10-04."""
+    if not smoke:
+        raise SystemExit("Start full stages with: modal deploy modal_app.py && python modal_app.py train <stage>")
+    train_stage.remote(stage, smoke, local_git_commit())
 
 
 @app.local_entrypoint()
@@ -163,3 +156,24 @@ def publish(stage: int) -> None:
 @app.local_entrypoint()
 def publish_model_card() -> None:
     upload_card.remote(Path("docs/model-card.md").read_text())
+
+
+def start_job(argv: list[str]) -> None:
+    """Start a long job on the deployed app and return at once. The job does not depend on this process.
+
+    python modal_app.py train <stage>
+    python modal_app.py calibrate
+    """
+    if argv[:1] == ["train"] and len(argv) == 2:
+        call = modal.Function.from_name("jevstral", "train_stage").spawn(int(argv[1]), False, local_git_commit())
+    elif argv == ["calibrate"]:
+        call = modal.Function.from_name("jevstral", "calibrate_stage4").spawn()
+    else:
+        raise SystemExit("usage: python modal_app.py train <stage> | calibrate")
+    print(f"started {call.object_id}. Follow it at https://modal.com/apps (app jevstral, deployed).")
+
+
+if __name__ == "__main__":
+    import sys
+
+    start_job(sys.argv[1:])
