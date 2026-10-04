@@ -8,13 +8,13 @@ Example: for a support ticket, the question "Which team?" with the options `bill
 
 ## Status
 
-Work in progress. Stage 1 of 4 is training.
+Work in progress. Stage 1 of 4 is done.
 
 | Step | Status |
 |---|---|
 | Code for all stages and calibration | Done |
 | Data download and verification | Done |
-| Stage 1: base | Training |
+| Stage 1: base | Done. `decision-v7` development: accuracy 0.881, Brier 0.193, ECE 0.065 (before calibration) |
 | Stages 2, 3 and 4 | Not started |
 | Calibration | Not started |
 | Benchmarks against Kev | Not started |
