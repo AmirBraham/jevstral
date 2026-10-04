@@ -146,6 +146,13 @@ def check_hub() -> None:
 
 
 @app.function(image=image, secrets=SECRETS, timeout=600)
+def make_model_public() -> None:
+    from jevstral.publish import make_public
+
+    print("public:", make_public())
+
+
+@app.function(image=image, secrets=SECRETS, timeout=600)
 def upload_card(card: str) -> None:
     from jevstral.publish import publish_card
 

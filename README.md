@@ -2,6 +2,8 @@
 
 > **Disclaimer.** Jevstral is an independent personal project. It is not affiliated with, endorsed by or sponsored by Mistral AI. "Mistral" and "Ministral" are names of Mistral AI. This project only uses the open-weight model `mistralai/Ministral-3-8B-Base-2512`, which Mistral AI publishes under the Apache 2.0 license. Jevstral is also not affiliated with TypeSafe (the company that makes Jev) or with the author of Kev.
 
+Model weights: [AmirBraham/jevstral-8b](https://huggingface.co/AmirBraham/jevstral-8b) on Hugging Face (use the `stage4/` folder).
+
 Jevstral is a decision model. It reads one document and a set of typed questions. It gives a probability for each option of each question. It does not generate text.
 
 Example: for a support ticket, the question "Which team?" with the options `billing`, `shipping` and `returns` gets one probability for each option. Software can then act on a threshold, for example: if p ≥ 0.9, route the ticket automatically.
@@ -79,7 +81,7 @@ The `huggingface` secret needs a token with write access. After a stage finishes
 uv run modal run modal_app.py::publish --stage 1
 ```
 
-This uploads `final/`, `metrics.json` and `log.jsonl` of the stage to the folder `stage1/` of the private repository `<user>/jevstral-8b`.
+This uploads `final/`, `metrics.json` and `log.jsonl` of the stage to the folder `stage1/` of the repository `<user>/jevstral-8b`. The job creates the repository as private if it does not exist.
 
 ## Monitor
 

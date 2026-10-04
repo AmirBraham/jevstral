@@ -20,7 +20,7 @@ datasets:
 
 Jevstral is a decision model. It reads one document (the *state*) and a set of typed questions. It gives a probability for each option of each question, in one forward pass. It does not generate text.
 
-Code: [github.com/AmirBraham/jevstral](https://github.com/AmirBraham/jevstral) (private while in progress).
+Code: [github.com/AmirBraham/jevstral](https://github.com/AmirBraham/jevstral).
 
 ## Status
 

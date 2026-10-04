@@ -21,6 +21,13 @@ def token_report() -> str:
     return f"token '{auth.get('displayName')}', role {auth.get('role')}"
 
 
+def make_public() -> str:
+    """Make the model repository public."""
+    repo_id = ensure_repo()
+    HfApi().update_repo_settings(repo_id, private=False)
+    return repo_id
+
+
 def publish_card(card: str) -> str:
     """Upload the model card as README.md of the repository."""
     repo_id = ensure_repo()
