@@ -11,6 +11,6 @@ render() {  # name height
 }
 render architecture 640
 render training 790
-render decision-index 600
+render decision-index 630
 render latency 600
 render stage4 520

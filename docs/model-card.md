@@ -27,7 +27,7 @@ Code: [github.com/AmirBraham/jevstral](https://github.com/AmirBraham/jevstral).
 
 Training and calibration are done. **Use the `stage4/` folder**: it is the final, calibrated model (T = 2.04). The folders `stage1/` to `stage3/` are intermediate checkpoints, kept for reproducibility. They are not calibrated.
 
-The [Decision Index](https://huggingface.co/spaces/multimodalart/jev-decision-index) benchmark against other decision models is in progress.
+Decision Index 0.2.1: **34.3** (rank 36 of 74), median latency **28.3 ms** on one RTX PRO 6000. See Benchmark.
 
 ## Model details
 
@@ -113,7 +113,24 @@ The results of each training stage are in the [training log](https://github.com/
 
 ## Benchmark
 
-In progress: the [Decision Index 0.2.1](https://huggingface.co/spaces/multimodalart/jev-decision-index) (38 benchmarks in five areas), which already scores other decision models, including Jev (57.9). Jevstral runs the same suite with the public harness.
+[Decision Index 0.2.1](https://huggingface.co/spaces/multimodalart/jev-decision-index): 38 benchmarks in five areas, chance-corrected (0 is random guessing, 100 is perfect). Full run of the suite (150,317 requests) with the [public harness](https://github.com/apolinario/decision-index) on one NVIDIA RTX PRO 6000. All requests were answered, with no errors.
+
+| Area (weight) | Jevstral 8B | Kev 4B | Kev 9B | Jev |
+|---|---|---|---|---|
+| Knowledge and reasoning (25.8 %) | **24.5** | 22.9 | 26.2 | 51.4 |
+| Language understanding (25.8 %) | **34.6** | 35.3 | 41.7 | 62.0 |
+| Retrieval and classification (20.0 %) | **39.3** | 41.0 | 43.7 | 55.4 |
+| Tools and automation (18.3 %) | **52.9** | 52.6 | 54.5 | 75.1 |
+| Arts and human taste (10 %) | **14.8** | 17.9 | 22.4 | 37.7 |
+| **Decision Index** | **34.3** | 34.6 | 38.5 | 57.9 |
+
+Rank: 36 of 74. Other models: public leaderboard, data of 2026-10-01.
+
+Latency, one request at a time: median **28.3 ms**, p95 185 ms, mean 79 ms (bf16 weights, LoRA merged, the document read once for all its questions).
+
+Notes: BANKING77 is in the Decision Index and in the training data. 200 MMLU-Pro questions were used to fit the temperature; the temperature does not change the answers. Jev is a hosted API, so its latency includes the network.
+
+Full results: [`docs/benchmark/`](https://github.com/AmirBraham/jevstral/tree/main/docs/benchmark) in the code repository.
 
 ## Intended use
 

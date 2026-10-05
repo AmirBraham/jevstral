@@ -43,10 +43,11 @@
     <div class="step"><span class="n">7</span><h2>Fast inference</h2>
       <p>bf16 weights with LoRA merged. The document is read once for all its questions.</p>
       <div class="facts">Mean probability change vs fp32: 0.003</div>
-      <div class="result">Median: <b>45.5 ms</b> per request</div></div>
+      <div class="result">Median: <b>28.3 ms</b> per request</div></div>
     <div class="step"><span class="n">8</span><h2>Benchmark</h2>
       <p>Decision Index 0.2.1: 150,000 requests over 38 benchmarks, with the public harness.</p>
-      <div class="facts">One RTX PRO 6000 · same GPU as the leaderboard</div></div>
+      <div class="facts">One RTX PRO 6000 · 3 h 21 min · no errors</div>
+      <div class="result">Decision Index: <b>34.3</b> · rank 36/74</div></div>
   </div>
   <div class="legend">
     <span><i class="sw" style="background: var(--clay)"></i>Changes the model weights</span>

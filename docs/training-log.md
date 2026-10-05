@@ -61,7 +61,14 @@ Reference: the final Kev-4B model scores 0.873, 0.891, 0.786 and 0.739 on these 
 
 Loss curves: Weights & Biases project `jevstral` (private).
 
+## Benchmark run
+
+Decision Index 0.2.1, full suite: 150,317 requests on one RTX PRO 6000, 3 hours 21 minutes, no errors. Decision Index 34.3, rank 36 of 74. Median latency 28.3 ms.
+
+The run used the bf16 path with LoRA merged. For requests with more than one question, the document is read once (state cache). On a 100-request sample, the cache halved the p95 latency, but made one-question requests slower, so the run uses it only when a request has more than one question.
+
 ## Incidents
 
 - **Delimiter embeddings.** The five reserved tokens that Jevstral uses as delimiters have all-zero embedding rows in Ministral 3. Stage 1 starts them as samples of the real embedding distribution. See `docs/concepts/lora.md`, section 9.
+- **Suite build.** The first build was preempted after 30 minutes and lost its work, because it saved its volume only at the end. A second build failed at its last step: the harness reads files from a `hub/` folder that only exists in a git checkout. The fixed build runs as non-preemptible, saves every 5 minutes and copies `hub/` from the pinned harness commit.
 - **Stage 4, first run.** A network failure on the local computer cancelled the job at step 680, before its first resume checkpoint. Full stages now run on the deployed Modal app and save a resume checkpoint every 15 minutes.

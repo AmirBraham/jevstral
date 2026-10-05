@@ -87,20 +87,39 @@ The fast inference path uses bf16 weights with LoRA merged into the base weights
 
 ## 4. Benchmarks
 
-The [Decision Index 0.2.1](https://huggingface.co/spaces/multimodalart/jev-decision-index) is a public benchmark for decision models: 38 benchmarks in five areas, about 150,000 requests. Jevstral runs it with the [public harness](https://github.com/apolinario/decision-index) on one NVIDIA RTX PRO 6000, the GPU that the leaderboard uses.
+The [Decision Index 0.2.1](https://huggingface.co/spaces/multimodalart/jev-decision-index) is a public benchmark for decision models: 38 benchmarks in five areas. Each score is chance-corrected: 0 is random guessing, 100 is perfect. Jevstral ran the full suite (150,317 requests) with the [public harness](https://github.com/apolinario/decision-index) on one NVIDIA RTX PRO 6000, the GPU that the leaderboard uses. All requests were answered, with no errors, in 3 hours 21 minutes.
 
-**Status: the full run is in progress.** The chart shows the score when the run is complete.
+**Result: 34.3, rank 36 of 74.**
 
 ![Decision Index 0.2.1](docs/images/decision-index.png)
 
+| Area (weight) | Jevstral 8B | Kev 4B | Kev 9B | Jev |
+|---|---|---|---|---|
+| Knowledge and reasoning (25.8 %) | **24.5** | 22.9 | 26.2 | 51.4 |
+| Language understanding (25.8 %) | **34.6** | 35.3 | 41.7 | 62.0 |
+| Retrieval and classification (20.0 %) | **39.3** | 41.0 | 43.7 | 55.4 |
+| Tools and automation (18.3 %) | **52.9** | 52.6 | 54.5 | 75.1 |
+| Arts and human taste (10 %) | **14.8** | 17.9 | 22.4 | 37.7 |
+| **Decision Index** | **34.3** | 34.6 | 38.5 | 57.9 |
+
 ![Median latency for one request](docs/images/latency.png)
+
+Latency on the full suite, one request at a time: median **28.3 ms**, p95 185 ms, mean 79 ms.
+
+What the results show:
+
+- Jevstral has the quality of Kev 4B (34.6), the model whose recipe it follows, on a Mistral backbone. It is better on knowledge and tools, and worse on language, retrieval and arts.
+- Its median latency is lower than that of every model on this chart except Laya.
+- The gap to Jev (57.9) is large in every area. Other open models show that most of this gap comes from training data, not model size.
 
 Points to know when you compare the results:
 
-- **Latency.** The Jevstral value comes from a 100-request sample of the suite. Jev is a hosted API, so its time includes the network.
 - **Training overlap.** BANKING77 is in the Decision Index and in the training data of Jevstral and Kev.
 - **Calibration data.** 200 MMLU-Pro questions were used to fit the temperature. MMLU-Pro is also in the Decision Index. The temperature does not change the answers.
+- **Latency.** Jev is a hosted API, so its time includes the network.
 - **Self-reported scores.** The Clef scores come from their authors.
+
+The full results are in [`docs/benchmark/`](docs/benchmark/): `scores.json`, `index.json` and `benchmark-summary.json` (each benchmark, with its score and latency).
 
 ## 5. Use the model
 

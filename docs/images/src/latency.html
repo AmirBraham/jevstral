@@ -5,7 +5,7 @@
   <h1>Median latency for one request</h1>
   <p class="sub">Decision Index requests, one request at a time. Lower is better.</p>
   <svg id="chart"></svg>
-  <p class="foot">Jevstral: 100-request sample of the suite on one NVIDIA RTX PRO 6000, the GPU of the leaderboard. Other models: leaderboard values. Jev is a hosted API, so its time includes the network.</p>
+  <p class="foot">Jevstral: all 150,317 requests of the suite on one NVIDIA RTX PRO 6000, the GPU of the leaderboard (p95: 185 ms). Other models: leaderboard values. Jev is a hosted API, so its time includes the network.</p>
 </div>
 <script src="chart.js"></script>
 <script>
@@ -13,8 +13,8 @@ barChart({
   max: 600, ticks: [0, 100, 200, 300, 400, 500, 600], unit: " ms",
   rows: [
     { label: "Laya · 0.4B", value: 5.8 },
+    { label: "Jevstral · 8B", value: 28.3, accent: true },
     { label: "Clef-flash · 9B", value: 38.8 },
-    { label: "Jevstral · 8B", value: 45.5, accent: true },
     { label: "Kev · 9B", value: 51.4 },
     { label: "Kev · 4B", value: 52.1 },
     { label: "Clef · 27B", value: 209.3 },
