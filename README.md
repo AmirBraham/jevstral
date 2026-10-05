@@ -119,7 +119,7 @@ Points to know when you compare the results:
 - **Latency.** Jev is a hosted API, so its time includes the network.
 - **Self-reported scores.** The Clef scores come from their authors.
 
-The full results are in [`docs/benchmark/`](docs/benchmark/): `scores.json`, `index.json` and `benchmark-summary.json` (each benchmark, with its score and latency).
+The full results are in [`docs/benchmark/`](docs/benchmark/): `scores.json`, `index.json` and `benchmark-summary.json` (each benchmark, with its score and latency). The complete run, in the harness format, is the public dataset [AmirBraham/jevstral-decision-index](https://huggingface.co/datasets/AmirBraham/jevstral-decision-index). Leaderboard submission: [apolinario/decision-index#65](https://github.com/apolinario/decision-index/pull/65) (in review).
 
 ## 5. Use the model
 

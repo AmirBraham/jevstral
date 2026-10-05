@@ -130,7 +130,7 @@ Latency, one request at a time: median **28.3 ms**, p95 185 ms, mean 79 ms (bf16
 
 Notes: BANKING77 is in the Decision Index and in the training data. 200 MMLU-Pro questions were used to fit the temperature; the temperature does not change the answers. Jev is a hosted API, so its latency includes the network.
 
-Full results: [`docs/benchmark/`](https://github.com/AmirBraham/jevstral/tree/main/docs/benchmark) in the code repository.
+Full results: the public dataset [AmirBraham/jevstral-decision-index](https://huggingface.co/datasets/AmirBraham/jevstral-decision-index). Leaderboard submission: [apolinario/decision-index#65](https://github.com/apolinario/decision-index/pull/65) (in review).
 
 ## Intended use
 
@@ -152,7 +152,21 @@ Full results: [`docs/benchmark/`](https://github.com/AmirBraham/jevstral/tree/ma
 
 ## How to load
 
-The checkpoints use a custom head and input format. Load them with the code in the Jevstral repository (`jevstral.checkpoint.load`). Each `stageN/final/` folder has:
+```bash
+pip install "jevstral[inference] @ git+https://github.com/AmirBraham/jevstral"
+```
+
+```python
+from jevstral.engine import checkpoint_directory
+from jevstral.inference import Predictor
+
+folder, _ = checkpoint_directory("AmirBraham/jevstral-8b", "main")  # downloads stage4/final
+predictor = Predictor(folder)
+predictor("I was charged twice for order 1182.", {"team": {"type": "choice", "instructions": "Which team?",
+          "criteria": {"billing": None, "shipping": None}}})
+```
+
+The checkpoints use a custom head and input format. Each `stageN/final/` folder has:
 
 - `adapter/`: the LoRA weights and the delimiter rows (PEFT format).
 - `head.pt`: the pointer head and the temperature.
