@@ -414,7 +414,7 @@ def upload_benchmark_run() -> None:
     print("uploaded:", url)
 
 
-PUBLIC_COMMIT = "3fb98a1"  # the Jevstral commit to test as an outside user would install it
+PUBLIC_COMMIT = "27ff3d0"  # the Jevstral commit to test as an outside user would install it
 public_image = (
     modal.Image.debian_slim(python_version="3.11")
     .apt_install("git")
