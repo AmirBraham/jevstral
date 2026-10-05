@@ -15,6 +15,21 @@ from .records import to_request
 from .stages import STAGES
 
 PATHS = ("fp32", "bf16-merged")
+WEIGHTS_REPO = "AmirBraham/jevstral-8b"
+FINAL = "stage4/final"  # the calibrated final checkpoint in WEIGHTS_REPO
+
+
+def checkpoint_directory(checkpoint: str, revision: str) -> tuple[Path, str]:
+    """A local checkpoint folder, or a Hub repository whose FINAL folder is downloaded. Returns (folder, source)."""
+    if Path(checkpoint).is_dir():
+        return Path(checkpoint), checkpoint
+    from huggingface_hub import HfApi, snapshot_download
+
+    sha = HfApi().model_info(checkpoint, revision=revision).sha
+    local = snapshot_download(checkpoint, revision=sha, allow_patterns=[f"{FINAL}/*"])
+    return Path(local) / FINAL, f"{checkpoint}@{sha}"
+
+
 PARITY_RECORDS = 100  # for each development file
 LATENCY_REQUESTS = 100  # for each request kind
 WARMUP_REQUESTS = 3

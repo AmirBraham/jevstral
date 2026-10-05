@@ -6,28 +6,14 @@ The default checkpoint is the final model on the Hugging Face Hub; it is downloa
 """
 
 import json
-from pathlib import Path
 
 import torch
 from decision_index.engines import Engine, Unsupported
 
 from .encode import SERVE, RecordTooLong
-from .inference import Predictor
+from .inference import WEIGHTS_REPO, Predictor, checkpoint_directory
 
 MODEL_NAME = "jevstral-8b"
-WEIGHTS_REPO = "AmirBraham/jevstral-8b"
-FINAL = "stage4/final"  # the calibrated final checkpoint in WEIGHTS_REPO
-
-
-def checkpoint_directory(checkpoint: str, revision: str) -> tuple[Path, str]:
-    """A local checkpoint folder, or a Hub repository whose FINAL folder is downloaded. Returns (folder, source)."""
-    if Path(checkpoint).is_dir():
-        return Path(checkpoint), checkpoint
-    from huggingface_hub import HfApi, snapshot_download
-
-    sha = HfApi().model_info(checkpoint, revision=revision).sha
-    local = snapshot_download(checkpoint, revision=sha, allow_patterns=[f"{FINAL}/*"])
-    return Path(local) / FINAL, f"{checkpoint}@{sha}"
 
 
 class JevstralEngine(Engine):

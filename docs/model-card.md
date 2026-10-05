@@ -157,8 +157,7 @@ pip install "jevstral[inference] @ git+https://github.com/AmirBraham/jevstral"
 ```
 
 ```python
-from jevstral.engine import checkpoint_directory
-from jevstral.inference import Predictor
+from jevstral.inference import Predictor, checkpoint_directory
 
 folder, _ = checkpoint_directory("AmirBraham/jevstral-8b", "main")  # downloads stage4/final
 predictor = Predictor(folder)
