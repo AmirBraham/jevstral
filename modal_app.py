@@ -31,7 +31,7 @@ HARNESS_COMMIT = "87d4650b42b377c0291a89c1f1a879f9b31082bf"  # the same commit a
 image = (
     modal.Image.debian_slim(python_version="3.12")
     .apt_install("git")  # uv fetches the pinned Decision Index harness from GitHub
-    .uv_sync(groups=["train", "bench"])
+    .uv_sync(groups=["train", "bench"], extras=["inference"])
     # The harness reads its hub/ files (manifest, exclusions) from <site-packages>/hub, a path that only exists in a
     # git checkout. Copy them from the same pinned commit.
     .run_commands(

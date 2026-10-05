@@ -1,18 +1,23 @@
 [project]
 name = "jevstral"
 version = "0.1.0"
-description = "A decision model on Ministral 3 8B, trained with the Kev method"
+description = "A System One decision model on Ministral 3 8B"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
-requires-python = ">=3.12,<3.13"
-dependencies = ["modal>=1.6,<2"]
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+# Inference and training: pip install "jevstral[inference] @ git+https://github.com/AmirBraham/jevstral"
+inference = ["torch>=2.6", "transformers>=5.18,<6", "peft>=0.21"]
 
 [dependency-groups]
-# Installed only in the Modal image (modal_app.py), not on the local computer.
-train = ["torch==2.14.1", "transformers==5.18.0", "peft==0.21.2", "wandb>=0.22"]
+# The local computer: the Modal client and the linter. All model work runs on Modal.
+dev = ["modal>=1.6,<2", "ruff>=0.14"]
+# Training extras, installed only in the Modal image.
+train = ["wandb>=0.22"]
 # The Decision Index harness, pinned to one commit. Installed only in the Modal image.
 bench = ["decision-index[rebuild] @ git+https://github.com/apolinario/decision-index@87d4650b42b377c0291a89c1f1a879f9b31082bf"]
-dev = ["ruff>=0.14"]
 
 [build-system]
 requires = ["hatchling"]
@@ -23,7 +28,7 @@ packages = ["src/jevstral"]
 
 [tool.ruff]
 line-length = 120
-target-version = "py312"
+target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]

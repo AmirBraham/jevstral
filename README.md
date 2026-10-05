@@ -127,7 +127,7 @@ You need an NVIDIA GPU with 24 GB of memory or more, and [uv](https://docs.astra
 
 ```
 git clone https://github.com/AmirBraham/jevstral && cd jevstral
-uv sync --group train
+uv sync --extra inference
 uv run hf download AmirBraham/jevstral-8b --include "stage4/final/*" --local-dir weights
 ```
 

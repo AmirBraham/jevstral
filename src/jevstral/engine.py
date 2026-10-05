@@ -1,6 +1,8 @@
 """Jevstral as an engine of the Decision Index harness (github.com/apolinario/decision-index).
 
-Run it with: python -m decision_index run --engine jevstral.engine:JevstralEngine --option checkpoint=<dir>
+Install:  pip install "jevstral[inference] @ git+https://github.com/AmirBraham/jevstral"
+Run:      python -m decision_index run --engine jevstral.engine:JevstralEngine
+The default checkpoint is the final model on the Hugging Face Hub; it is downloaded on first use.
 """
 
 import json
@@ -13,6 +15,19 @@ from .encode import SERVE, RecordTooLong
 from .inference import Predictor
 
 MODEL_NAME = "jevstral-8b"
+WEIGHTS_REPO = "AmirBraham/jevstral-8b"
+FINAL = "stage4/final"  # the calibrated final checkpoint in WEIGHTS_REPO
+
+
+def checkpoint_directory(checkpoint: str, revision: str) -> tuple[Path, str]:
+    """A local checkpoint folder, or a Hub repository whose FINAL folder is downloaded. Returns (folder, source)."""
+    if Path(checkpoint).is_dir():
+        return Path(checkpoint), checkpoint
+    from huggingface_hub import HfApi, snapshot_download
+
+    sha = HfApi().model_info(checkpoint, revision=revision).sha
+    local = snapshot_download(checkpoint, revision=sha, allow_patterns=[f"{FINAL}/*"])
+    return Path(local) / FINAL, f"{checkpoint}@{sha}"
 
 
 class JevstralEngine(Engine):
@@ -23,16 +38,22 @@ class JevstralEngine(Engine):
     )
 
     def __init__(
-        self, checkpoint: str = "/runs/main/stage4/final", path: str = "bf16-merged", cache: bool = True, **options
+        self,
+        checkpoint: str = WEIGHTS_REPO,
+        revision: str = "main",
+        path: str = "bf16-merged",
+        cache: bool = True,
+        **options,
     ):
         super().__init__(**options)
-        directory = Path(checkpoint)
+        directory, source = checkpoint_directory(checkpoint, revision)
         self.predictor = Predictor(directory, path, cache=cache)
         config = json.loads((directory / "config.json").read_text())
         temperature = torch.load(directory / "head.pt", map_location="cpu", weights_only=True)["temperature"]
         self.provenance = {
             "kind": "trained",
             "model": MODEL_NAME,
+            "weights": source,
             "base_model": config["base_model"],
             "base_revision": config["base_revision"],
             "git_commit": config["git_commit"],
