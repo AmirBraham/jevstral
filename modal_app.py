@@ -371,6 +371,96 @@ def bench_full(path: str = "bf16-merged") -> None:
         )
 
 
+RESULTS_DATASET = "jevstral-decision-index"
+RESULTS_CARD = """---
+license: apache-2.0
+tags: [decision-index, decision-model, benchmark-results]
+---
+
+# Jevstral 8B: Decision Index 0.2.1 results
+
+Complete run of the [Decision Index 0.2.1](https://github.com/apolinario/decision-index) suite (150,317 requests)
+for [AmirBraham/jevstral-8b](https://huggingface.co/AmirBraham/jevstral-8b), made with the public harness
+(commit `87d4650`) on one NVIDIA RTX PRO 6000.
+
+- Decision Index: 34.29. Raw index: 50.19.
+- All requests answered, no errors, no refusals.
+- Median latency 28.3 ms, p95 185 ms (one request at a time).
+
+Files are in `runs/jevstral-8b/`, in the format of the harness `upload_run`: `scores.json` (`"complete": true`),
+`index.json`, `benchmark-summary.json`, `environment.json`, `status.json` and `results.jsonl.gz` (compact results,
+without the request payloads).
+
+Engine: `jevstral.engine:JevstralEngine` from [github.com/AmirBraham/jevstral](https://github.com/AmirBraham/jevstral).
+"""
+
+
+@app.function(image=image, volumes={str(BENCH_DIR): bench}, secrets=SECRETS, memory=16384, timeout=HOUR)
+def upload_benchmark_run() -> None:
+    """Upload the full run to a public Hub dataset, in the harness format (runs/jevstral-8b/)."""
+    from decision_index.pipeline import upload_run
+    from huggingface_hub import HfApi
+
+    api = HfApi()
+    repo_id = f"{api.whoami()['name']}/{RESULTS_DATASET}"
+    url = upload_run(repo_id, BENCH_DIR / "runs" / "full-bf16-merged", path_in_repo="runs/jevstral-8b", private=False)
+    api.upload_file(
+        path_or_fileobj=RESULTS_CARD.encode(),
+        path_in_repo="README.md",
+        repo_id=repo_id,
+        repo_type="dataset",
+        commit_message="Add dataset card",
+    )
+    print("uploaded:", url)
+
+
+PUBLIC_COMMIT = "3fb98a1"  # the Jevstral commit to test as an outside user would install it
+public_image = (
+    modal.Image.debian_slim(python_version="3.11")
+    .apt_install("git")
+    .uv_pip_install(
+        f"jevstral[inference] @ git+https://github.com/AmirBraham/jevstral@{PUBLIC_COMMIT}",
+        f"decision-index @ git+https://github.com/apolinario/decision-index@{HARNESS_COMMIT}",
+    )
+    .env({"HF_HOME": "/cache/hf"})
+)
+
+
+@app.function(
+    image=public_image,
+    gpu=BENCH_GPU,
+    volumes={"/cache": hf_cache, str(BENCH_DIR): bench},
+    secrets=SECRETS,
+    memory=65536,
+    timeout=HOUR,
+)
+def check_public_install(n: int = 20) -> None:
+    """Install Jevstral from GitHub with pip in a clean image, then run n suite requests with the default engine
+    options: the weights come from the Hugging Face Hub. This is how the leaderboard maintainers will run it."""
+    import sys
+
+    out = f"/tmp/public-check-{n}"
+    command = [
+        sys.executable,
+        "-m",
+        "decision_index",
+        "run",
+        "--engine",
+        "jevstral.engine:JevstralEngine",
+        "--suite-dir",
+        str(SUITE_DIR),
+        "--rows",
+        str(BENCH_DIR / "sample-100.jsonl.gz"),
+        "--limit",
+        str(n),
+        "--out",
+        out,
+        "--fresh",
+    ]
+    subprocess.run(command, check=True)
+    print(open(f"{out}/environment.json").read())
+
+
 def local_git_commit() -> str:
     commit = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()
     dirty = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True, check=True).stdout.strip()
